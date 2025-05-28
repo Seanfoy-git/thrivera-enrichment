@@ -299,6 +299,70 @@ const handleFileUpload = useCallback((event) => {
 
   event.target.value = '';
 }, []);
+const handleFileUpload = useCallback((event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  setUploadError('');
+
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    setUploadError('Please upload a CSV file.');
+    return;
+  }
+
+  Papa.parse(file, {
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      if (results.errors.length > 0) {
+        console.warn('CSV parsing warnings:', results.errors);
+      }
+
+      if (results.data.length === 0) {
+        setUploadError('The CSV file appears to be empty.');
+        return;
+      }
+
+      // Fix variant titles - copy title from first variant to all variants of same product
+      const titleMap = new Map();
+      
+      // First pass: collect titles for each handle
+      results.data.forEach((product) => {
+        if (product.Handle && product.Title?.trim()) {
+          titleMap.set(product.Handle, product.Title.trim());
+        }
+      });
+      
+      // Second pass: fill in missing titles
+      results.data.forEach((product) => {
+        if (product.Handle && (!product.Title || !product.Title.trim())) {
+          const savedTitle = titleMap.get(product.Handle);
+          if (savedTitle) {
+            product.Title = savedTitle;
+          }
+        }
+      });
+
+      const enrichedProducts = results.data.map((product, index) => ({
+        ...product,
+        id: product.Handle || product.ID || `product_${index}`,
+        enriched: false,
+        enrichedAt: null
+      }));
+
+      setProducts(enrichedProducts);
+      setFilteredProducts(enrichedProducts);
+      console.log('Uploaded', enrichedProducts.length, 'products');
+    },
+    error: (error) => {
+      console.error('CSV parsing error:', error);
+      setUploadError('Error reading CSV file: ' + error.message);
+    }
+  });
+
+  event.target.value = '';
+}, []);
 // Group by Handle and fill in missing titles
 const productMap = new Map();
 results.data.forEach((product, index) => {
