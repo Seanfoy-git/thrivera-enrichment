@@ -319,9 +319,14 @@ const processAllProducts = useCallback(async () => {
   try {
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    const processedProducts = products.map((product, index) => {
+    // Process products one by one to avoid overwhelming the API
+    const processedProducts = [];
+    
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+      
       try {
-        console.log(`Processing product ${index + 1}:`, product.Title);
+        console.log(`Processing product ${i + 1}:`, product.Title);
         
         const detectedCollection = detectCollection(product);
         console.log('Detected collection:', detectedCollection);
@@ -348,18 +353,22 @@ const processAllProducts = useCallback(async () => {
           newTags,
           newSeoTitle: seoContent.title,
           newSeoDescription: seoContent.description,
-          // Add Google Shopping data
           ...googleShopping
         };
         
         console.log('Final product result for', product.Title, ':', result);
-        return result;
+        processedProducts.push(result);
+        
+        // Small delay between products to be nice to the API
+        if (i < products.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
         
       } catch (error) {
         console.error('Error processing product:', product.Title, error);
-        return product; // Return original product if processing fails
+        processedProducts.push(product); // Add original product if processing fails
       }
-    });
+    }
     
     setProducts(processedProducts);
     console.log('Processing completed for', processedProducts.length, 'products');
