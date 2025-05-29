@@ -222,6 +222,7 @@ const App = () => {
 
   // Generate Google Shopping Data
   const generateGoogleShopping = (product, collection) => {
+    console.log('Generating Google Shopping data for:', product.Title, 'Collection:', collection);
     const title = (product.Title || '').toLowerCase();
     const price = parseFloat(product['Variant Price']) || 0;
     const vendor = product.Vendor || '';
