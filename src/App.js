@@ -689,7 +689,7 @@ const processAllProducts = useCallback(async () => {
     </div>
 
     {/* Your existing content continues here... */}
-    <input type="file" ... /></div>
+   
               <p className="text-gray-600">Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.</p>
             </div>
             {totalCount > 0 && (
