@@ -691,7 +691,6 @@ const App = () => {
                   Processed Products ({filteredProducts.length})
                 </h2>
               </div>
-              <div className="divide-y divide-gray-200 max-
               <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
                {filteredProducts.length === 0 ? (
                  <div className="p-6 text-center text-gray-500">
