@@ -716,8 +716,8 @@ const processAllProducts = useCallback(async () => {
                    {searchTerm || filterStatus !== 'all' ? 'No products match your search criteria.' : 'No processed products to display.'}
                  </div>
                ) : (
-                 filteredProducts.map((product) => (
-                   <div key={product.id} className="p-6">
+                filteredProducts.map((product, index) => (
+  <div key={`${product.id}-${index}`} className="p-6">
                      <div className="flex items-start justify-between mb-4">
                        <div className="flex-1">
                          <div className="flex items-center gap-3 mb-2">
