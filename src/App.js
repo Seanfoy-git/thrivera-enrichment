@@ -159,6 +159,9 @@ const generateAIDescription = async (product, collection, originalDesc) => {
     throw new Error('OpenAI API key not found');
   }
 
+  // Remove this line after debugging - it's exposing your API key!
+  // console.log('API Key present:', apiKey ? 'YES' : 'NO', 'Length:', apiKey?.length || 0);
+
   const collectionGuidance = {
     'Mind and Mood': 'Focus on mental wellness, tranquility, mindfulness, and emotional balance. Use calming, nurturing language.',
     'Movement and Flow': 'Emphasize active wellness, body support, mobility, and movement freedom. Use encouraging, supportive language.',
@@ -179,26 +182,39 @@ LENGTH: 2-3 sentences, 50-80 words.
 
 Write now:`;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 150,
-      temperature: 0.7
-    })
-  });
+  console.log('Making OpenAI API request for:', product.Title);
 
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey.trim()}` // Added .trim() to remove any whitespace
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 150,
+        temperature: 0.7
+      })
+    });
+
+    console.log('OpenAI Response Status:', response.status);
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('OpenAI API Error Details:', errorData);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+    }
+
+    const data = await response.json();
+    console.log('OpenAI Success for:', product.Title);
+    return data.choices[0].message.content.trim();
+    
+  } catch (error) {
+    console.error('OpenAI API Call Failed:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  return data.choices[0].message.content.trim();
 };
 
 // ADD THIS: Voice consistency function
