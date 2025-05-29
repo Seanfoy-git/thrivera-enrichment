@@ -656,36 +656,35 @@ const processAllProducts = useCallback(async () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                🌿 Thrivera Product Enrichment
-              </h1>
-              return (
-  <div className="app">
-    
-    {/* ADD THIS SECTION RIGHT HERE: */}
-    <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-      <h3>Processing Mode</h3>
-      
-      <label style={{ display: 'block', marginBottom: '10px' }}>
-        <input 
-          type="radio" 
-          value="smart" 
-          checked={processingMode === 'smart'}
-          onChange={(e) => setProcessingMode(e.target.value)}
-        />
-        Smart Mode - Skip already enriched products
-      </label>
-      
-      <label style={{ display: 'block', marginBottom: '10px' }}>
-        <input 
-          type="radio" 
-          value="force" 
-          checked={processingMode === 'force'}
-          onChange={(e) => setProcessingMode(e.target.value)}
-        />
-        Force All - Reprocess everything
-      </label>
-    </div>
+             <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+  </h1>🌿 Thrivera Product Enrichment</h1>
+<p className="text-gray-600">Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.</p>
+
+{/* Processing Mode Section */}
+<div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginTop: '20px' }}>
+  <h3>Processing Mode</h3>
+  
+  <label style={{ display: 'block', marginBottom: '10px' }}>
+    <input 
+      type="radio" 
+      value="smart" 
+      checked={processingMode === 'smart'}
+      onChange={(e) => setProcessingMode(e.target.value)}
+    />
+    Smart Mode - Skip already enriched products
+  </label>
+  
+  <label style={{ display: 'block', marginBottom: '10px' }}>
+    <input 
+      type="radio" 
+      value="force" 
+      checked={processingMode === 'force'}
+      onChange={(e) => setProcessingMode(e.target.value)}
+    />
+    Force All - Reprocess everything
+  </label>
+</div>
+</div>
 
     {/* Your existing content continues here... */}
    
