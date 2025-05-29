@@ -936,6 +936,6 @@ const processAllProducts = useCallback(async () => {
      </div>
    </div>
  );
-};
+}
 
 export default App;
