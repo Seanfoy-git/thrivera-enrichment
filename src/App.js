@@ -257,24 +257,33 @@ const App = () => {
     };
   };
 
-  // Process all products automatically
-  const processAllProducts = useCallback(async () => {
-    if (products.length === 0) return;
+ // Process all products automatically
+const processAllProducts = useCallback(async () => {
+  if (products.length === 0) return;
+  
+  setProcessing(true);
+  setUploadError('');
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    setProcessing(true);
-    setUploadError('');
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const processedProducts = products.map(product => {
+    const processedProducts = products.map((product, index) => {
+      try {
+        console.log(`Processing product ${index + 1}:`, product.Title);
+        
         const detectedCollection = detectCollection(product);
+        console.log('Detected collection:', detectedCollection);
+        
         const newDescription = generateThriveraDescription(product, detectedCollection);
         const seoContent = generateSEO(product, detectedCollection);
+        
+        console.log('About to generate Google Shopping data...');
         const googleShopping = generateGoogleShopping(product, detectedCollection);
+        console.log('Google Shopping data generated:', googleShopping);
+        
         const newTags = collectionTags[detectedCollection].tags.join(', ');
         
-        return {
+        const result = {
           ...product,
           enriched: true,
           enrichedAt: new Date().toISOString(),
@@ -290,18 +299,26 @@ const App = () => {
           // Add Google Shopping data
           ...googleShopping
         };
-      });
-      
-      setProducts(processedProducts);
-      console.log('Processing completed for', processedProducts.length, 'products');
-      
-    } catch (error) {
-      console.error('Processing error:', error);
-      setUploadError('Error processing products: ' + error.message);
-    } finally {
-      setProcessing(false);
-    }
-  }, [products]);
+        
+        console.log('Final product result for', product.Title, ':', result);
+        return result;
+        
+      } catch (error) {
+        console.error('Error processing product:', product.Title, error);
+        return product; // Return original product if processing fails
+      }
+    });
+    
+    setProducts(processedProducts);
+    console.log('Processing completed for', processedProducts.length, 'products');
+    
+  } catch (error) {
+    console.error('Processing error:', error);
+    setUploadError('Error processing products: ' + error.message);
+  } finally {
+    setProcessing(false);
+  }
+}, [products]);
 
   // Handle file upload - Fixed for variants
   const handleFileUpload = useCallback((event) => {
