@@ -657,7 +657,8 @@ const processAllProducts = useCallback(async () => {
           <div className="flex items-center justify-between">
             <div>
              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-  </h1>🌿 Thrivera Product Enrichment</h1>
+  🌿 Thrivera Product Enrichment
+  </h1>
 <p className="text-gray-600">Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.</p>
 
 {/* Processing Mode Section */}
