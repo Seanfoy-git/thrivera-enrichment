@@ -1,3 +1,5 @@
+// Google Shopping Debug Version - Updated 2025-05-29
+import React, { useState, useCallback, useEffect } from 'react';
 import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, Download, Check, Search, RefreshCw, Wand2, AlertCircle, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
