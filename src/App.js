@@ -6,27 +6,27 @@ import Papa from 'papaparse';
 const App = () => {
   // Thrivera Collection Knowledge Base
   const collectionTags = {
-    "Mind and Mood": {
-      tags: ["mind", "mood", "focus", "aromatherapy"],
-      keywords: ["essential oil", "aromatherapy", "diffuser", "scent", "fragrance", "focus", "concentration", "mental", "clarity", "meditation", "mindfulness", "stress", "anxiety", "mood", "emotional", "calm mind", "mental wellness"]
-    },
-    "Movement and Flow": {
-      tags: ["movement", "mobility", "stretch", "flow"],
-      keywords: ["yoga", "exercise", "fitness", "stretch", "mobility", "movement", "flow", "muscle", "joint", "flexibility", "workout", "active", "physical", "body", "posture", "balance", "strength"]
-    },
-    "Rest and Sleep": {
-      tags: ["rest", "sleep", "night", "calm"],
-      keywords: ["sleep", "night", "bedtime", "pillow", "mattress", "blanket", "rest", "relaxation", "calm", "peaceful", "soothing", "nighttime", "evening", "slumber", "tranquil", "serene"]
-    },
-    "Supportive Living": {
-      tags: ["safety", "support", "confidence", "home"],
-      keywords: ["support", "safety", "secure", "confidence", "home", "daily living", "independence", "assist", "help", "stability", "reliable", "comfort zone", "protection", "security"]
-    },
-    "Everyday Comforts": {
-      tags: ["comfort", "ease", "cushion"],
-      keywords: ["comfort", "cushion", "soft", "cozy", "ease", "gentle", "plush", "padded", "ergonomic", "everyday", "daily", "convenient", "simple", "effortless"]
-    }
-  };
+  "Mind and Mood": {
+    tags: ["Mind", "Mood", "focus"], // Capitalized to match Shopify
+    keywords: ["essential oil", "aromatherapy", "diffuser", "scent", "fragrance", "focus", "concentration", "mental", "clarity", "meditation", "mindfulness", "stress", "anxiety", "mood", "emotional", "calm mind", "mental wellness"]
+  },
+  "Movement and Flow": {
+    tags: ["movement", "mobility", "stretch"], // Removed "flow"
+    keywords: ["yoga", "exercise", "fitness", "stretch", "mobility", "movement", "flow", "muscle", "joint", "flexibility", "workout", "active", "physical", "body", "posture", "balance", "strength"]
+  },
+  "Rest and Sleep": {
+    tags: ["Rest", "Sleep", "night"], // Capitalized Rest & Sleep, removed "calm"
+    keywords: ["sleep", "night", "bedtime", "pillow", "mattress", "blanket", "rest", "relaxation", "calm", "peaceful", "soothing", "nighttime", "evening", "slumber", "tranquil", "serene"]
+  },
+  "Supportive Living": {
+    tags: ["Safety", "Support", "confidence"], // Capitalized Safety & Support, removed "home"
+    keywords: ["support", "safety", "secure", "confidence", "home", "daily living", "independence", "assist", "help", "stability", "reliable", "comfort zone", "protection", "security"]
+  },
+  "Everyday Comforts": {
+    tags: ["comfort", "ease", "cushion"], // Already correct
+    keywords: ["comfort", "cushion", "soft", "cozy", "ease", "gentle", "plush", "padded", "ergonomic", "everyday", "daily", "convenient", "simple", "effortless"]
+  }
+};
 
   // Google Shopping Category Mapping
   const googleShoppingData = {
@@ -138,60 +138,111 @@ const App = () => {
   };
 
   // Generate Thrivera Description - retaining all vendor details
-  const generateThriveraDescription = (product, collection) => {
-    const productName = product.Title?.trim() || product.Handle || 'this wellness essential';
-    const originalDesc = (product['Body (HTML)'] || '').replace(/<[^>]*>/g, '').trim();
+const generateThriveraDescription = async (product, collection) => {
+  const originalDesc = (product['Body (HTML)'] || '').replace(/<[^>]*>/g, '').trim();
+  
+  try {
+    const aiDescription = await generateAIDescription(product, collection, originalDesc);
+    const finalDescription = ensureThriveraVoice(aiDescription, collection);
+    return finalDescription;
     
-    if (!originalDesc) {
-      return `Experience wellness with our thoughtfully curated ${productName.toLowerCase()}. Designed with your well-being in mind. Embrace wellness, naturally.`;
-    }
-    
-    const descriptive = thriveraVoice.descriptiveWords[Math.floor(Math.random() * thriveraVoice.descriptiveWords.length)];
-    const benefit = thriveraVoice.benefits[Math.floor(Math.random() * thriveraVoice.benefits.length)];
-    const closing = thriveraVoice.closings[Math.floor(Math.random() * thriveraVoice.closings.length)];
+  } catch (error) {
+    console.error('OpenAI generation failed, using fallback:', error);
+    return generateFallbackDescription(product, collection, originalDesc);
+  }
+};
+// ADD THIS: OpenAI API function
+const generateAIDescription = async (product, collection, originalDesc) => {
+  const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('OpenAI API key not found');
+  }
 
-    let description = '';
-
-    // Collection-specific wellness-focused intros
-    if (collection === 'Mind and Mood') {
-      description = `Nurture your mind and elevate your mood with this ${descriptive} wellness essential. `;
-    } else if (collection === 'Movement and Flow') {
-      description = `Support your active lifestyle with this ${descriptive} movement companion. `;
-    } else if (collection === 'Rest and Sleep') {
-      description = `Create your sanctuary of rest with this ${descriptive} sleep essential. `;
-    } else if (collection === 'Supportive Living') {
-      description = `Enhance your daily confidence with this ${descriptive} supportive solution. `;
-    } else {
-      description = `Embrace everyday comfort with this ${descriptive} wellness essential. `;
-    }
-
-    // Transform vendor description into Thrivera voice while keeping all details
-    let enhancedDesc = originalDesc
-      .replace(/\b(great|good|nice|excellent)\b/gi, 'thoughtfully designed')
-      .replace(/\b(perfect|ideal)\b/gi, 'beautifully suited')
-      .replace(/\b(high-quality|premium|top-quality)\b/gi, 'mindfully crafted')
-      .replace(/\b(comfortable|comfy)\b/gi, 'gently supportive')
-      .replace(/\b(durable|long-lasting)\b/gi, 'lovingly made to last')
-      .replace(/\b(easy to use|simple)\b/gi, 'effortlessly integrated into your wellness routine')
-      .replace(/\b(affordable|budget-friendly)\b/gi, 'accessible wellness')
-      .replace(/\b(effective|powerful)\b/gi, 'naturally effective')
-      .replace(/\b(recommended|suggested)\b/gi, 'lovingly selected')
-      .replace(/\b(helps|assists)\b/gi, 'gently supports')
-      .replace(/\b(provides|offers|gives)\b/gi, 'nurtures you with');
-
-    description += enhancedDesc;
-    
-    if (!description.trim().endsWith('.') && !description.trim().endsWith('!')) {
-      description += '. ';
-    } else {
-      description += ' ';
-    }
-    
-    description += `This ${benefit}. ${closing}`;
-
-    return description;
+  const collectionGuidance = {
+    'Mind and Mood': 'Focus on mental wellness, tranquility, mindfulness, and emotional balance. Use calming, nurturing language.',
+    'Movement and Flow': 'Emphasize active wellness, body support, mobility, and movement freedom. Use encouraging, supportive language.',
+    'Rest and Sleep': 'Highlight sleep quality, peaceful rest, comfort, and nighttime wellness. Use soothing, gentle language.',
+    'Supportive Living': 'Focus on independence, confidence, daily support, and life enhancement. Use empowering, caring language.',
+    'Everyday Comforts': 'Emphasize daily comfort, ease of use, gentle support, and everyday wellness. Use warm, comforting language.'
   };
 
+  const prompt = `Write a product description for Thrivera wellness store.
+
+PRODUCT: ${product.Title}
+COLLECTION: ${collection}
+ORIGINAL: ${originalDesc || 'No description'}
+
+VOICE: Nurturing, mindful, caring. Use "thoughtfully designed," "mindfully crafted," "gently supports."
+FOCUS: ${collectionGuidance[collection]}
+LENGTH: 2-3 sentences, 50-80 words.
+
+Write now:`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 150,
+      temperature: 0.7
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
+};
+
+// ADD THIS: Voice consistency function
+const ensureThriveraVoice = (description, collection) => {
+  const voiceTransforms = {
+    'high-quality': 'mindfully crafted',
+    'premium': 'thoughtfully designed',
+    'excellent': 'beautifully crafted',
+    'helps': 'gently supports',
+    'provides': 'nurtures you with',
+    'comfortable': 'gently supportive',
+    'effective': 'naturally beneficial',
+    'perfect': 'beautifully suited',
+    'great': 'wonderfully supportive'
+  };
+
+  let enhancedDesc = description;
+  
+  Object.keys(voiceTransforms).forEach(original => {
+    const regex = new RegExp(`\\b${original}\\b`, 'gi');
+    enhancedDesc = enhancedDesc.replace(regex, voiceTransforms[original]);
+  });
+
+  if (!enhancedDesc.trim().endsWith('.')) {
+    enhancedDesc += '.';
+  }
+
+  return enhancedDesc;
+};
+
+// ADD THIS: Fallback function
+const generateFallbackDescription = (product, collection) => {
+  const productName = product.Title?.toLowerCase() || 'wellness essential';
+  
+  const fallbackTemplates = {
+    'Mind and Mood': `Nurture your mental wellness with this thoughtfully designed ${productName}. Mindfully crafted to support your daily tranquility.`,
+    'Movement and Flow': `Support your active lifestyle with this gently effective ${productName}. Beautifully designed to enhance your movement.`,
+    'Rest and Sleep': `Create your peaceful sanctuary with this lovingly made ${productName}. Thoughtfully designed to support restful sleep.`,
+    'Supportive Living': `Enhance your daily confidence with this reliably supportive ${productName}. Mindfully crafted to nurture your independence.`,
+    'Everyday Comforts': `Embrace daily comfort with this gently supportive ${productName}. Thoughtfully designed to enhance your wellness routine.`
+  };
+
+  return fallbackTemplates[collection] || fallbackTemplates['Everyday Comforts'];
+};
   // Generate SEO Content with Thrivera differentiation
   const generateSEO = (product, collection) => {
     const productName = product.Title?.trim() || product.Handle || 'Wellness Product';
@@ -275,7 +326,7 @@ const processAllProducts = useCallback(async () => {
         const detectedCollection = detectCollection(product);
         console.log('Detected collection:', detectedCollection);
         
-        const newDescription = generateThriveraDescription(product, detectedCollection);
+        const newDescription = await generateThriveraDescription(product, detectedCollection);
         const seoContent = generateSEO(product, detectedCollection);
         
         console.log('About to generate Google Shopping data...');
