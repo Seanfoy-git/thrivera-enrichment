@@ -56,6 +56,28 @@ const App = () => {
       customLabel3: "comfort"
     }
   };
+  const isAlreadyEnriched = (product) => {
+    const description = (product['Body (HTML)'] || '').toLowerCase();
+    const tags = (product.Tags || '').toLowerCase();
+    
+    const thriveraWords = [
+      'mindfully crafted', 'thoughtfully designed', 'gently supports',
+      'nurtures you with', 'lovingly made', 'wellness essential'
+    ];
+    
+    const hasThriveraVoice = thriveraWords.some(word => 
+      description.includes(word.toLowerCase())
+    );
+    
+    const ourTags = ['mind', 'mood', 'focus', 'movement', 'mobility', 'stretch', 
+                     'rest', 'sleep', 'night', 'safety', 'support', 'confidence',
+                     'comfort', 'ease', 'cushion'];
+    
+    const hasOurTags = ourTags.some(tag => tags.includes(tag.toLowerCase()));
+    
+    return hasThriveraVoice || hasOurTags;
+  };
+
 
   // Thrivera Brand Voice Templates
   const thriveraVoice = {
@@ -70,6 +92,12 @@ const App = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [uploadError, setUploadError] = useState('');
+  const [processingMode, setProcessingMode] = useState('smart');
+  const [processingStats, setProcessingStats] = useState({ 
+    total: 0, 
+    toProcess: 0, 
+    alreadyEnriched: 0 
+  });
 
   // Load settings from localStorage on startup
   useEffect(() => {
@@ -632,6 +660,36 @@ const processAllProducts = useCallback(async () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
                 🌿 Thrivera Product Enrichment
               </h1>
+              return (
+  <div className="app">
+    
+    {/* ADD THIS SECTION RIGHT HERE: */}
+    <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
+      <h3>Processing Mode</h3>
+      
+      <label style={{ display: 'block', marginBottom: '10px' }}>
+        <input 
+          type="radio" 
+          value="smart" 
+          checked={processingMode === 'smart'}
+          onChange={(e) => setProcessingMode(e.target.value)}
+        />
+        Smart Mode - Skip already enriched products
+      </label>
+      
+      <label style={{ display: 'block', marginBottom: '10px' }}>
+        <input 
+          type="radio" 
+          value="force" 
+          checked={processingMode === 'force'}
+          onChange={(e) => setProcessingMode(e.target.value)}
+        />
+        Force All - Reprocess everything
+      </label>
+    </div>
+
+    {/* Your existing content continues here... */}
+    <input type="file" ... /></div>
               <p className="text-gray-600">Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.</p>
             </div>
             {totalCount > 0 && (
