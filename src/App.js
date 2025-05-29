@@ -26,7 +26,7 @@ const App = () => {
     tags: ["comfort", "ease", "cushion"], // Already correct
     keywords: ["comfort", "cushion", "soft", "cozy", "ease", "gentle", "plush", "padded", "ergonomic", "everyday", "daily", "convenient", "simple", "effortless"]
   }
-
+  };
   // Google Shopping Category Mapping
   const googleShoppingData = {
     "Mind and Mood": {
