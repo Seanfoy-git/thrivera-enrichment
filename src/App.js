@@ -27,6 +27,35 @@ const App = () => {
     }
   };
 
+  // Google Shopping Category Mapping
+  const googleShoppingData = {
+    "Mind and Mood": {
+      category: "Health & Beauty > Personal Care > Aromatherapy",
+      customLabel0: "Mind-and-Mood",
+      customLabel3: "aromatherapy"
+    },
+    "Movement and Flow": {
+      category: "Sporting Goods > Exercise & Fitness",
+      customLabel0: "Movement-and-Flow", 
+      customLabel3: "fitness"
+    },
+    "Rest and Sleep": {
+      category: "Home & Garden > Decor > Home Fragrance",
+      customLabel0: "Rest-and-Sleep",
+      customLabel3: "sleep-wellness"
+    },
+    "Supportive Living": {
+      category: "Health & Beauty > Health Care > Mobility & Daily Living Aids",
+      customLabel0: "Supportive-Living",
+      customLabel3: "daily-living"
+    },
+    "Everyday Comforts": {
+      category: "Home & Garden > Household Supplies",
+      customLabel0: "Everyday-Comforts",
+      customLabel3: "comfort"
+    }
+  };
+
   // Thrivera Brand Voice Templates
   const thriveraVoice = {
     descriptiveWords: ["nurturing", "gentle", "mindfully crafted", "thoughtfully designed", "carefully selected", "lovingly made", "wellness-focused", "naturally inspiring", "beautifully simple", "harmoniously balanced"],
@@ -191,6 +220,42 @@ const App = () => {
     };
   };
 
+  // Generate Google Shopping Data
+  const generateGoogleShopping = (product, collection) => {
+    const title = (product.Title || '').toLowerCase();
+    const price = parseFloat(product['Variant Price']) || 0;
+    const vendor = product.Vendor || '';
+    
+    // Smart gender detection
+    let gender = 'unisex';
+    if (title.includes('men') && !title.includes('women')) {
+      gender = 'male';
+    } else if (title.includes('women') && !title.includes('men')) {
+      gender = 'female';
+    }
+    
+    // Price range for custom label
+    let priceRange = 'budget';
+    if (price > 50) priceRange = 'premium';
+    else if (price > 25) priceRange = 'mid-range';
+    
+    // Get collection-specific data
+    const shoppingData = googleShoppingData[collection] || googleShoppingData["Everyday Comforts"];
+    
+    return {
+      'Google Shopping / Google Product Category': shoppingData.category,
+      'Google Shopping / Gender': gender,
+      'Google Shopping / Age Group': 'adult',
+      'Google Shopping / Condition': 'new',
+      'Google Shopping / Custom Product': 'FALSE',
+      'Google Shopping / Custom Label 0': shoppingData.customLabel0,
+      'Google Shopping / Custom Label 1': priceRange,
+      'Google Shopping / Custom Label 2': vendor.substring(0, 20),
+      'Google Shopping / Custom Label 3': shoppingData.customLabel3,
+      'Google Shopping / Custom Label 4': 'thrivera-wellness'
+    };
+  };
+
   // Process all products automatically
   const processAllProducts = useCallback(async () => {
     if (products.length === 0) return;
@@ -205,6 +270,7 @@ const App = () => {
         const detectedCollection = detectCollection(product);
         const newDescription = generateThriveraDescription(product, detectedCollection);
         const seoContent = generateSEO(product, detectedCollection);
+        const googleShopping = generateGoogleShopping(product, detectedCollection);
         const newTags = collectionTags[detectedCollection].tags.join(', ');
         
         return {
@@ -219,7 +285,9 @@ const App = () => {
           newDescription,
           newTags,
           newSeoTitle: seoContent.title,
-          newSeoDescription: seoContent.description
+          newSeoDescription: seoContent.description,
+          // Add Google Shopping data
+          ...googleShopping
         };
       });
       
@@ -352,7 +420,7 @@ const App = () => {
     }
   };
 
-  // Export functions - Fixed for web app
+  // Export functions - Enhanced with Google Shopping data
   const exportEnrichedData = (includeTracking = false) => {
     if (products.length === 0) {
       alert('No products to export. Please upload and process products first.');
@@ -389,6 +457,18 @@ const App = () => {
           cleanProduct['Tags'] = product.newTags || product.originalTags;
           cleanProduct['SEO Title'] = product.newSeoTitle || product.originalSeoTitle;
           cleanProduct['SEO Description'] = product.newSeoDescription || product.originalSeoDescription;
+          
+          // Add Google Shopping fields
+          cleanProduct['Google Shopping / Google Product Category'] = product['Google Shopping / Google Product Category'] || '';
+          cleanProduct['Google Shopping / Gender'] = product['Google Shopping / Gender'] || '';
+          cleanProduct['Google Shopping / Age Group'] = product['Google Shopping / Age Group'] || '';
+          cleanProduct['Google Shopping / Condition'] = product['Google Shopping / Condition'] || '';
+          cleanProduct['Google Shopping / Custom Product'] = product['Google Shopping / Custom Product'] || '';
+          cleanProduct['Google Shopping / Custom Label 0'] = product['Google Shopping / Custom Label 0'] || '';
+          cleanProduct['Google Shopping / Custom Label 1'] = product['Google Shopping / Custom Label 1'] || '';
+          cleanProduct['Google Shopping / Custom Label 2'] = product['Google Shopping / Custom Label 2'] || '';
+          cleanProduct['Google Shopping / Custom Label 3'] = product['Google Shopping / Custom Label 3'] || '';
+          cleanProduct['Google Shopping / Custom Label 4'] = product['Google Shopping / Custom Label 4'] || '';
         }
         
         if (includeTracking) {
@@ -457,7 +537,7 @@ const App = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
                 🌿 Thrivera Product Enrichment
               </h1>
-              <p className="text-gray-600">Automatically transform vendor product descriptions into consistent Thrivera wellness voice and assign proper collection tags.</p>
+              <p className="text-gray-600">Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.</p>
             </div>
             {totalCount > 0 && (
               <button
@@ -524,7 +604,7 @@ const App = () => {
                 ) : (
                   <>
                     <Wand2 className="h-5 w-5" />
-                    Process All Products with Thrivera Voice
+                    Process All Products with Thrivera Voice + Google Shopping
                   </>
                 )}
               </button>
@@ -535,7 +615,7 @@ const App = () => {
         {/* Collection Knowledge Base */}
         {products.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏷️ Thrivera Collections</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏷️ Thrivera Collections & Google Shopping</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(collectionTags).map(([collection, data]) => (
                 <div key={collection} className="bg-thrivera-light border border-green-200 rounded-lg p-4">
@@ -547,8 +627,11 @@ const App = () => {
                       </span>
                     ))}
                   </div>
-                  <p className="text-xs text-green-700">
-                    Auto-detected by keywords: {data.keywords.slice(0, 3).join(', ')}...
+                  <p className="text-xs text-green-700 mb-1">
+                    Auto-detected by: {data.keywords.slice(0, 3).join(', ')}...
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Google Category: {googleShoppingData[collection]?.category.split(' > ').pop()}
                   </p>
                 </div>
               ))}
@@ -608,80 +691,91 @@ const App = () => {
                   Processed Products ({filteredProducts.length})
                 </h2>
               </div>
+              <div className="divide-y divide-gray-200 max-
               <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-                {filteredProducts.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">
-                    {searchTerm || filterStatus !== 'all' ? 'No products match your search criteria.' : 'No processed products to display.'}
-                  </div>
-                ) : (
-                  filteredProducts.map((product) => (
-                    <div key={product.id} className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-medium text-gray-900">
-                              {product.Title?.trim() || product.Handle || `Product ${product.id || 'Unknown'}`}
-                            </h3>
-                            {product.enriched && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <Check className="h-3 w-3 mr-1" />
-                                {product.detectedCollection}
-                              </span>
-                            )}
-                          </div>
-                          
-                          {product.Vendor && (
-                            <p className="text-sm text-gray-500 mb-2">Vendor: {product.Vendor}</p>
-                          )}
-                          
-                          {product.enriched && (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-                              {/* Original */}
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Original Description</h4>
-                                <div className="bg-gray-50 border rounded-md p-3 text-sm text-gray-600 max-h-32 overflow-y-auto">
-                                  {product.originalDescription.replace(/<[^>]*>/g, '') || 'No description'}
-                                </div>
-                              </div>
-                              
-                              {/* Thrivera Version */}
-                              <div>
-                                <h4 className="text-sm font-medium text-green-700 mb-2">Thrivera Description</h4>
-                                <div className="bg-thrivera-light border border-green-200 rounded-md p-3 text-sm text-green-800 max-h-32 overflow-y-auto">
-                                  {product.newDescription}
-                                </div>
-                              </div>
-                              
-                              {/* Tags & SEO */}
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Collection Tags</h4>
-                                <div className="flex flex-wrap gap-1">
-                                  {product.newTags.split(', ').map(tag => (
-                                    <span key={tag} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                                      {tag}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">SEO Content</h4>
-                                <div className="text-xs text-gray-600 space-y-1">
-                                  <div><strong>Title:</strong> {product.newSeoTitle}</div>
-                                  <div><strong>Description:</strong> {product.newSeoDescription}</div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </>
-        )}
+               {filteredProducts.length === 0 ? (
+                 <div className="p-6 text-center text-gray-500">
+                   {searchTerm || filterStatus !== 'all' ? 'No products match your search criteria.' : 'No processed products to display.'}
+                 </div>
+               ) : (
+                 filteredProducts.map((product) => (
+                   <div key={product.id} className="p-6">
+                     <div className="flex items-start justify-between mb-4">
+                       <div className="flex-1">
+                         <div className="flex items-center gap-3 mb-2">
+                           <h3 className="text-lg font-medium text-gray-900">
+                             {product.Title?.trim() || product.Handle || `Product ${product.id || 'Unknown'}`}
+                           </h3>
+                           {product.enriched && (
+                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                               <Check className="h-3 w-3 mr-1" />
+                               {product.detectedCollection}
+                             </span>
+                           )}
+                         </div>
+                         
+                         {product.Vendor && (
+                           <p className="text-sm text-gray-500 mb-2">Vendor: {product.Vendor}</p>
+                         )}
+                         
+                         {product.enriched && (
+                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+                             {/* Original */}
+                             <div>
+                               <h4 className="text-sm font-medium text-gray-700 mb-2">Original Description</h4>
+                               <div className="bg-gray-50 border rounded-md p-3 text-sm text-gray-600 max-h-32 overflow-y-auto">
+                                 {product.originalDescription.replace(/<[^>]*>/g, '') || 'No description'}
+                               </div>
+                             </div>
+                             
+                             {/* Thrivera Version */}
+                             <div>
+                               <h4 className="text-sm font-medium text-green-700 mb-2">Thrivera Description</h4>
+                               <div className="bg-thrivera-light border border-green-200 rounded-md p-3 text-sm text-green-800 max-h-32 overflow-y-auto">
+                                 {product.newDescription}
+                               </div>
+                             </div>
+                             
+                             {/* Tags & SEO */}
+                             <div>
+                               <h4 className="text-sm font-medium text-gray-700 mb-2">Collection Tags</h4>
+                               <div className="flex flex-wrap gap-1">
+                                 {product.newTags.split(', ').map(tag => (
+                                   <span key={tag} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                                     {tag}
+                                   </span>
+                                 ))}
+                               </div>
+                             </div>
+                             
+                             <div>
+                               <h4 className="text-sm font-medium text-gray-700 mb-2">SEO Content</h4>
+                               <div className="text-xs text-gray-600 space-y-1">
+                                 <div><strong>Title:</strong> {product.newSeoTitle}</div>
+                                 <div><strong>Description:</strong> {product.newSeoDescription}</div>
+                               </div>
+                             </div>
+
+                             {/* Google Shopping Data */}
+                             <div className="lg:col-span-2">
+                               <h4 className="text-sm font-medium text-blue-700 mb-2">Google Shopping Data</h4>
+                               <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-blue-800 space-y-1">
+                                 <div><strong>Category:</strong> {product['Google Shopping / Google Product Category']}</div>
+                                 <div><strong>Gender:</strong> {product['Google Shopping / Gender']} | <strong>Condition:</strong> {product['Google Shopping / Condition']}</div>
+                                 <div><strong>Labels:</strong> {product['Google Shopping / Custom Label 0']}, {product['Google Shopping / Custom Label 1']}, {product['Google Shopping / Custom Label 4']}</div>
+                               </div>
+                             </div>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   </div>
+                 ))
+               )}
+             </div>
+           </div>
+         </>
+       )}
 
        {/* Footer */}
        <div className="mt-8 text-center text-sm text-gray-500">
