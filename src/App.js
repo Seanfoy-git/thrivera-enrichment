@@ -214,10 +214,13 @@ Original Product: ${title}
 Original Description: ${originalDescription}
 Collection: ${collection}
 
+IMPORTANT: DO NOT start with "Indulge" - this word is overused. Instead start with: "Discover," "Experience," "Embrace," "Enjoy," "Find," "Create," or "Welcome."
+
 Create a description that:
+- NEVER starts with "Indulge"
 - Focuses on wellness benefits and how it enhances daily life
 - Uses warm, inclusive, supportive language
-- Avoids overused words like "indulge" - use alternatives like "enjoy," "embrace," "experience," "savor"
+- Uses varied opening words like "Discover," "Experience," "Embrace," "Enjoy," "Find," "Create"
 - Keeps ALL specific product details (size, color, flavor, scent, material, etc.)
 - Mentions the collection context (${collection})
 - Is 2-3 paragraphs, around 150-200 words
