@@ -135,33 +135,44 @@ const App = () => {
     }
   };
 
-  // Automatic Collection Detection
-  const detectCollection = (product) => {
-    const title = (product.Title || '').toLowerCase();
-    const description = (product['Body (HTML)'] || '').toLowerCase().replace(/<[^>]*>/g, '');
-    const vendor = (product.Vendor || '').toLowerCase();
-    const productType = (product.Type || '').toLowerCase();
-    const tags = (product.Tags || '').toLowerCase();
-    const searchText = `${title} ${description} ${vendor} ${productType} ${tags}`;
-
-    let bestMatch = null;
-    let highestScore = 0;
-
-    Object.entries(collectionTags).forEach(([collection, data]) => {
-      let score = 0;
-      data.keywords.forEach(keyword => {
-        if (searchText.includes(keyword.toLowerCase())) {
-          score += keyword.length;
-        }
-      });
-      
-      if (score > highestScore) {
-        highestScore = score;
-        bestMatch = collection;
-      }
-    });
-
-    return bestMatch || "Everyday Comforts";
+ // Collection Detection Function
+  const detectCollection = (title, description) => {
+    const text = `${title} ${description}`.toLowerCase();
+    
+    // Mind and Mood - mental wellness, focus, clarity
+    if (text.includes('focus') || text.includes('clarity') || text.includes('mind') || 
+        text.includes('mood') || text.includes('meditation') || text.includes('stress') ||
+        text.includes('anxiety') || text.includes('calm') || text.includes('mental') ||
+        text.includes('cognitive') || text.includes('brain') || text.includes('concentration')) {
+      return 'Mind and Mood';
+    }
+    
+    // Rest and Sleep - sleep, rest, relaxation
+    if (text.includes('sleep') || text.includes('rest') || text.includes('night') ||
+        text.includes('bedtime') || text.includes('pillow') || text.includes('mattress') ||
+        text.includes('blanket') || text.includes('relaxation') || text.includes('dream') ||
+        text.includes('insomnia') || text.includes('slumber')) {
+      return 'Rest and Sleep';
+    }
+    
+    // Movement and Flow - exercise, mobility, physical activity
+    if (text.includes('movement') || text.includes('mobility') || text.includes('stretch') ||
+        text.includes('exercise') || text.includes('fitness') || text.includes('yoga') ||
+        text.includes('flow') || text.includes('flexibility') || text.includes('muscle') ||
+        text.includes('joint') || text.includes('physical') || text.includes('active')) {
+      return 'Movement and Flow';
+    }
+    
+    // Supportive Living - safety, support, confidence
+    if (text.includes('safety') || text.includes('support') || text.includes('confidence') ||
+        text.includes('secure') || text.includes('protection') || text.includes('assist') ||
+        text.includes('stability') || text.includes('balance') || text.includes('help') ||
+        text.includes('aid') || text.includes('therapeutic')) {
+      return 'Supportive Living';
+    }
+    
+    // Default to Everyday Comforts
+    return 'Everyday Comforts';
   };
 
   // Generate Thrivera Description - retaining all vendor details
@@ -197,7 +208,22 @@ const generateAIDescription = async (product, collection, originalDesc) => {
     'Everyday Comforts': 'Emphasize daily comfort, ease of use, gentle support, and everyday wellness. Use warm, comforting language.'
   };
 
-  const prompt = `Write a product description for Thrivera wellness store.
+const prompt = `Transform this product description into Thrivera's wellness-focused voice. Keep all specific details like size, color, flavor, scent, material, dimensions, or technical specifications from the original.
+
+Original Product: ${title}
+Original Description: ${originalDescription}
+Collection: ${collection}
+
+Create a description that:
+- Focuses on wellness benefits and how it enhances daily life
+- Uses warm, inclusive, supportive language
+- Avoids overused words like "indulge" - use alternatives like "enjoy," "embrace," "experience," "savor"
+- Keeps ALL specific product details (size, color, flavor, scent, material, etc.)
+- Mentions the collection context (${collection})
+- Is 2-3 paragraphs, around 150-200 words
+- Ends with "Experience the Thrivera difference."
+
+Write only the product description, no titles or extra text.`;
 
 PRODUCT: ${product.Title}
 COLLECTION: ${collection}
