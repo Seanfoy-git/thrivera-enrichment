@@ -217,7 +217,7 @@ Collection: ${collection}
 IMPORTANT: DO NOT start with "Indulge" - this word is overused. Instead start with: "Discover," "Experience," "Embrace," "Enjoy," "Find," "Create," or "Welcome."
 
 Create a description that:
-- NEVER starts with "Indulge"
+- NEVER starts with "Indulge" or uses "indulge" anywhere
 - Focuses on wellness benefits and how it enhances daily life
 - Uses warm, inclusive, supportive language
 - Uses varied opening words like "Discover," "Experience," "Embrace," "Enjoy," "Find," "Create"
