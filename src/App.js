@@ -225,16 +225,6 @@ Create a description that:
 
 Write only the product description, no titles or extra text.`;
 
-PRODUCT: ${product.Title}
-COLLECTION: ${collection}
-ORIGINAL: ${originalDesc || 'No description'}
-
-VOICE: Nurturing, mindful, caring. Use "thoughtfully designed," "mindfully crafted," "gently supports."
-FOCUS: ${collectionGuidance[collection]}
-LENGTH: 2-3 sentences, 50-80 words.
-
-Write now:`;
-
   console.log('Making OpenAI API request for:', product.Title);
 
   try {
