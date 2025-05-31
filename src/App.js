@@ -79,13 +79,7 @@ const App = () => {
     return hasThriveraVoice || hasOurTags;
   };
 
-  // Thrivera Brand Voice Templates
-  const thriveraVoice = {
-    descriptiveWords: ["nurturing", "gentle", "mindfully crafted", "thoughtfully designed", "carefully selected", "lovingly made", "wellness-focused", "naturally inspiring", "beautifully simple", "harmoniously balanced"],
-    benefits: ["supports your wellness journey", "enhances your daily rituals", "brings peace to your everyday moments", "nurtures your well-being", "creates moments of tranquility", "supports your natural balance", "encourages mindful living", "promotes inner harmony"],
-    closings: ["Embrace wellness, naturally.", "Your journey to balance begins here.", "Designed with your well-being in mind.", "Supporting you every step of the way.", "Where wellness meets everyday living.", "Nurturing your path to inner peace."]
-  };
-
+  // State variables
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [processing, setProcessing] = useState(false);
@@ -106,7 +100,6 @@ const App = () => {
   const detectCollection = (title, description) => {
     const text = `${title} ${description}`.toLowerCase();
     
-    // Mind and Mood - mental wellness, focus, clarity
     if (text.includes('focus') || text.includes('clarity') || text.includes('mind') || 
         text.includes('mood') || text.includes('meditation') || text.includes('stress') ||
         text.includes('anxiety') || text.includes('calm') || text.includes('mental') ||
@@ -114,7 +107,6 @@ const App = () => {
       return 'Mind and Mood';
     }
     
-    // Rest and Sleep - sleep, rest, relaxation
     if (text.includes('sleep') || text.includes('rest') || text.includes('night') ||
         text.includes('bedtime') || text.includes('pillow') || text.includes('mattress') ||
         text.includes('blanket') || text.includes('relaxation') || text.includes('dream') ||
@@ -122,7 +114,6 @@ const App = () => {
       return 'Rest and Sleep';
     }
     
-    // Movement and Flow - exercise, mobility, physical activity
     if (text.includes('movement') || text.includes('mobility') || text.includes('stretch') ||
         text.includes('exercise') || text.includes('fitness') || text.includes('yoga') ||
         text.includes('flow') || text.includes('flexibility') || text.includes('muscle') ||
@@ -130,7 +121,6 @@ const App = () => {
       return 'Movement and Flow';
     }
     
-    // Supportive Living - safety, support, confidence
     if (text.includes('safety') || text.includes('support') || text.includes('confidence') ||
         text.includes('secure') || text.includes('protection') || text.includes('assist') ||
         text.includes('stability') || text.includes('balance') || text.includes('help') ||
@@ -138,23 +128,7 @@ const App = () => {
       return 'Supportive Living';
     }
     
-    // Default to Everyday Comforts
     return 'Everyday Comforts';
-  };
-
-  // Generate Thrivera Description - retaining all vendor details
-  const generateThriveraDescription = async (product, collection) => {
-    const originalDesc = (product['Body (HTML)'] || '').replace(/<[^>]*>/g, '').trim();
-    
-    try {
-      const aiDescription = await generateAIDescription(product, collection, originalDesc);
-      const finalDescription = ensureThriveraVoice(aiDescription, collection);
-      return finalDescription;
-      
-    } catch (error) {
-      console.error('OpenAI generation failed, using fallback:', error);
-      return generateFallbackDescription(product, collection, originalDesc);
-    }
   };
 
   // OpenAI API function
@@ -202,16 +176,12 @@ Write only the product description, no titles or extra text.`;
         })
       });
 
-      console.log('OpenAI Response Status:', response.status);
-      
       if (!response.ok) {
         const errorData = await response.text();
-        console.error('OpenAI API Error Details:', errorData);
         throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
       }
 
       const data = await response.json();
-      console.log('OpenAI Success for:', product.Title);
       return data.choices[0].message.content.trim();
       
     } catch (error) {
@@ -220,50 +190,21 @@ Write only the product description, no titles or extra text.`;
     }
   };
 
-  // Voice consistency function
-  const ensureThriveraVoice = (description, collection) => {
-    const voiceTransforms = {
-      'high-quality': 'mindfully crafted',
-      'premium': 'thoughtfully designed',
-      'excellent': 'beautifully crafted',
-      'helps': 'gently supports',
-      'provides': 'nurtures you with',
-      'comfortable': 'gently supportive',
-      'effective': 'naturally beneficial',
-      'perfect': 'beautifully suited',
-      'great': 'wonderfully supportive'
-    };
-
-    let enhancedDesc = description;
+  // Generate Thrivera Description
+  const generateThriveraDescription = async (product, collection) => {
+    const originalDesc = (product['Body (HTML)'] || '').replace(/<[^>]*>/g, '').trim();
     
-    Object.keys(voiceTransforms).forEach(original => {
-      const regex = new RegExp(`\\b${original}\\b`, 'gi');
-      enhancedDesc = enhancedDesc.replace(regex, voiceTransforms[original]);
-    });
-
-    if (!enhancedDesc.trim().endsWith('.')) {
-      enhancedDesc += '.';
+    try {
+      const aiDescription = await generateAIDescription(product, collection, originalDesc);
+      return aiDescription;
+    } catch (error) {
+      console.error('OpenAI generation failed, using fallback:', error);
+      const productName = product.Title?.toLowerCase() || 'wellness essential';
+      return `Nurture your wellness with this thoughtfully designed ${productName}. Mindfully crafted to support your daily tranquility. Experience the Thrivera difference.`;
     }
-
-    return enhancedDesc;
   };
 
-  // Fallback function
-  const generateFallbackDescription = (product, collection) => {
-    const productName = product.Title?.toLowerCase() || 'wellness essential';
-    
-    const fallbackTemplates = {
-      'Mind and Mood': `Nurture your mental wellness with this thoughtfully designed ${productName}. Mindfully crafted to support your daily tranquility.`,
-      'Movement and Flow': `Support your active lifestyle with this gently effective ${productName}. Beautifully designed to enhance your movement.`,
-      'Rest and Sleep': `Create your peaceful sanctuary with this lovingly made ${productName}. Thoughtfully designed to support restful sleep.`,
-      'Supportive Living': `Enhance your daily confidence with this reliably supportive ${productName}. Mindfully crafted to nurture your independence.`,
-      'Everyday Comforts': `Embrace daily comfort with this gently supportive ${productName}. Thoughtfully designed to enhance your wellness routine.`
-    };
-
-    return fallbackTemplates[collection] || fallbackTemplates['Everyday Comforts'];
-  };
-
-  // Generate SEO Content with Thrivera differentiation
+  // Generate SEO Content
   const generateSEO = (product, collection) => {
     const productName = product.Title?.trim() || product.Handle || 'Wellness Product';
     const seoTitle = `${productName} - Wellness Collection | Thrivera`;
@@ -294,12 +235,10 @@ Write only the product description, no titles or extra text.`;
 
   // Generate Google Shopping Data
   const generateGoogleShopping = (product, collection) => {
-    console.log('Generating Google Shopping data for:', product.Title, 'Collection:', collection);
     const title = (product.Title || '').toLowerCase();
     const price = parseFloat(product['Variant Price']) || 0;
     const vendor = product.Vendor || '';
     
-    // Smart gender detection
     let gender = 'unisex';
     if (title.includes('men') && !title.includes('women')) {
       gender = 'male';
@@ -307,12 +246,10 @@ Write only the product description, no titles or extra text.`;
       gender = 'female';
     }
     
-    // Price range for custom label
     let priceRange = 'budget';
     if (price > 50) priceRange = 'premium';
     else if (price > 25) priceRange = 'mid-range';
     
-    // Get collection-specific data
     const shoppingData = googleShoppingData[collection] || googleShoppingData["Everyday Comforts"];
     
     return {
@@ -337,7 +274,6 @@ Write only the product description, no titles or extra text.`;
     setUploadError('');
     setCancelProcessing(false);
     
-    // Determine which products to process based on mode
     let productsToProcess = [];
     if (processingMode === 'smart') {
       productsToProcess = products.filter(product => !isAlreadyEnriched(product));
@@ -347,7 +283,6 @@ Write only the product description, no titles or extra text.`;
       console.log(`Force mode: Processing all ${products.length} products`);
     }
     
-    // Initialize progress tracking
     setProcessingStats({
       total: productsToProcess.length,
       current: 0,
@@ -363,13 +298,9 @@ Write only the product description, no titles or extra text.`;
     }
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Process products one by one to avoid overwhelming the API
-      const processedProducts = [...products]; // Start with all existing products
+      const processedProducts = [...products];
       
       for (let i = 0; i < productsToProcess.length; i++) {
-        // Check if user cancelled - THIS IS THE FIX
         if (cancelProcessing) {
           console.log('Processing cancelled by user at product', i + 1);
           setUploadError('Processing was cancelled by user.');
@@ -378,29 +309,21 @@ Write only the product description, no titles or extra text.`;
         
         const product = productsToProcess[i];
         
-        // Update progress - THIS IS THE FIX
         setProcessingStats(prev => ({
           ...prev,
           current: i + 1,
           currentProduct: product.Title || `Product ${i + 1}`
         }));
         
-        // Allow React to update the UI
         await new Promise(resolve => setTimeout(resolve, 100));
         
         try {
           console.log(`Processing product ${i + 1}:`, product.Title);
           
           const detectedCollection = detectCollection(product.Title, product['Body (HTML)'] || '');
-          console.log('Detected collection:', detectedCollection);
-          
           const newDescription = await generateThriveraDescription(product, detectedCollection);
           const seoContent = generateSEO(product, detectedCollection);
-          
-          console.log('About to generate Google Shopping data...');
           const googleShopping = generateGoogleShopping(product, detectedCollection);
-          console.log('Google Shopping data generated:', googleShopping);
-          
           const newTags = collectionTags[detectedCollection].tags.join(', ');
           
           const result = {
@@ -419,30 +342,24 @@ Write only the product description, no titles or extra text.`;
             ...googleShopping
           };
           
-          // Find the product in the main array and update it
           const productIndex = processedProducts.findIndex(p => p.id === product.id);
           if (productIndex !== -1) {
             processedProducts[productIndex] = result;
           }
           
-          // Update products state immediately so user can see progress
           setProducts([...processedProducts]);
           
-          console.log('Final product result for', product.Title, ':', result);
-          
-          // Small delay between products to be nice to the API
           if (i < productsToProcess.length - 1 && !cancelProcessing) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
           
         } catch (error) {
           console.error('Error processing product:', product.Title, error);
-          // Keep the original product if processing fails
         }
       }
       
       setProducts(processedProducts);
-      console.log('Processing completed for', processedProducts.filter(p => p.enriched).length, 'products');
+      console.log('Processing completed');
       
     } catch (error) {
       console.error('Processing error:', error);
@@ -454,7 +371,7 @@ Write only the product description, no titles or extra text.`;
     }
   }, [products, cancelProcessing, processingMode]);
 
-  // Handle file upload - Fixed for variants
+  // Handle file upload
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -480,17 +397,14 @@ Write only the product description, no titles or extra text.`;
           return;
         }
 
-        // Fix variant titles - copy title from first variant to all variants of same product
         const titleMap = new Map();
         
-        // First pass: collect titles for each handle
         results.data.forEach((product) => {
           if (product.Handle && product.Title?.trim()) {
             titleMap.set(product.Handle, product.Title.trim());
           }
         });
         
-        // Second pass: fill in missing titles
         results.data.forEach((product) => {
           if (product.Handle && (!product.Title || !product.Title.trim())) {
             const savedTitle = titleMap.get(product.Handle);
@@ -547,7 +461,7 @@ Write only the product description, no titles or extra text.`;
     applyFilters();
   }, [applyFilters]);
 
-  // Proper download function for web app
+  // Download function
   const downloadFile = (content, filename, contentType = 'text/csv;charset=utf-8;') => {
     try {
       const blob = new Blob([content], { type: contentType });
@@ -572,7 +486,7 @@ Write only the product description, no titles or extra text.`;
     }
   };
 
-  // Export functions - Enhanced with Google Shopping data
+  // Export functions
   const exportEnrichedData = (includeTracking = false) => {
     if (products.length === 0) {
       alert('No products to export. Please upload and process products first.');
@@ -589,7 +503,6 @@ Write only the product description, no titles or extra text.`;
       const enrichedData = products.map(product => {
         const cleanProduct = { ...product };
         
-        // Remove internal tracking fields
         delete cleanProduct.enriched;
         delete cleanProduct.enrichedAt;
         delete cleanProduct.detectedCollection;
@@ -603,14 +516,12 @@ Write only the product description, no titles or extra text.`;
         delete cleanProduct.newSeoDescription;
         delete cleanProduct.id;
         
-        // Update Shopify fields with enriched content
         if (product.enriched) {
           cleanProduct['Body (HTML)'] = product.newDescription || product.originalDescription;
           cleanProduct['Tags'] = product.newTags || product.originalTags;
           cleanProduct['SEO Title'] = product.newSeoTitle || product.originalSeoTitle;
           cleanProduct['SEO Description'] = product.newSeoDescription || product.originalSeoDescription;
           
-          // Add Google Shopping fields
           cleanProduct['Google Shopping / Google Product Category'] = product['Google Shopping / Google Product Category'] || '';
           cleanProduct['Google Shopping / Gender'] = product['Google Shopping / Gender'] || '';
           cleanProduct['Google Shopping / Age Group'] = product['Google Shopping / Age Group'] || '';
@@ -643,32 +554,7 @@ Write only the product description, no titles or extra text.`;
         `thrivera_products_with_tracking_${timestamp}.csv` :
         `thrivera_shopify_import_${timestamp}.csv`;
       
-      const success = downloadFile(csv, filename);
-      
-      if (success) {
-        console.log('Export completed:', filename);
-        const message = includeTracking ? 
-          `✅ Tracking export completed! Downloaded: ${filename}` :
-          `✅ Shopify import file ready! Downloaded: ${filename}`;
-        
-        const notification = document.createElement('div');
-        notification.textContent = message;
-        notification.style.cssText = `
-          position: fixed; top: 20px; right: 20px; z-index: 10000;
-          background: #059669; color: white; padding: 16px 24px;
-          border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-          font-size: 14px; max-width: 400px;
-        `;
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-          if (document.body.contains(notification)) {
-            document.body.removeChild(notification);
-          }
-        }, 4000);
-      } else {
-        alert('Export failed. Please check your browser settings and try again.');
-      }
+      downloadFile(csv, filename);
       
     } catch (error) {
       console.error('Export failed:', error);
@@ -682,7 +568,6 @@ Write only the product description, no titles or extra text.`;
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -693,11 +578,6 @@ Write only the product description, no titles or extra text.`;
                 Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.
               </p>
 
-              {/* Processing Mode Section */}
-              <div className="bg-gray-50 p-5 rounded-lg mt-5">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Processing Mode</h3>
-                
-              {/* Processing Mode Section */}
               <div className="bg-gray-50 p-5 rounded-lg mt-5">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Processing Mode</h3>
                 
@@ -713,6 +593,76 @@ Write only the product description, no titles or extra text.`;
                     <span className="font-medium">Smart Mode</span>
                     <p className="text-sm text-gray-600">Skip products that already have Thrivera voice or collection tags</p>
                   </div>
+                </label>
+                
+                <label className="flex items-center cursor-pointer">
+                  <input 
+                    type="radio" 
+                    value="force" 
+                    checked={processingMode === 'force'}
+                    onChange={(e) => setProcessingMode(e.target.value)}
+                    className="mr-3"
+                  />
+                  <div>
+                    <span className="font-medium">Force All</span>
+                    <p className="text-sm text-gray-600">Reprocess everything, even products that are already enriched</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+            {totalCount > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to clear all products? This cannot be undone.')) {
+                    setProducts([]);
+                    setFilteredProducts([]);
+                  }
+                }}
+                className="text-red-600 hover:text-red-800 flex items-center gap-2 text-sm"
+                title="Clear all products"
+              >
+                <Trash2 className="h-4 w-4" />
+                Clear All
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Upload & Process</h2>
+            {totalCount > 0 && (
+              <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                {enrichedCount} of {totalCount} products processed ({Math.round((enrichedCount/totalCount) * 100)}%)
+              </div>
+            )}
+          </div>
+          
+          {uploadError && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              <span className="text-red-800">{uploadError}</span>
+            </div>
+          )}
+          
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition-colors">
+            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <label htmlFor="file-upload" className="cursor-pointer">
+              <span className="mt-2 block text-sm font-medium text-gray-900">
+                Upload your Shopify CSV to begin automatic processing
+              </span>
+              <span className="mt-1 block text-xs text-gray-500">
+                Supports standard Shopify product export format
+              </span>
+              <input
+                id="file-upload"
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
           
           {products.length > 0 && !processing && (
             <div className="mt-6 text-center">
@@ -729,7 +679,6 @@ Write only the product description, no titles or extra text.`;
           {processing && (
             <div className="mt-6">
               <div className="flex flex-col items-center gap-4">
-                {/* Progress Bar */}
                 <div className="w-full max-w-lg">
                   <div className="flex justify-between text-sm text-gray-600 mb-2">
                     <span>Processing Products</span>
@@ -750,7 +699,6 @@ Write only the product description, no titles or extra text.`;
                   </div>
                 </div>
                 
-                {/* Status */}
                 <div className="flex items-center gap-2 text-green-600">
                   <RefreshCw className="h-5 w-5 animate-spin" />
                   <span>
@@ -759,7 +707,6 @@ Write only the product description, no titles or extra text.`;
                   </span>
                 </div>
                 
-                {/* Cancel Button */}
                 <button
                   onClick={() => setCancelProcessing(true)}
                   className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 flex items-center gap-2 transition-colors"
@@ -770,19 +717,171 @@ Write only the product description, no titles or extra text.`;
               </div>
             </div>
           )}
-                </label>
-                
-                <label className="flex items-center cursor-pointer">
-                  <input 
-                    type="radio" 
-                    value="force" 
-                    checked={processingMode === 'force'}
-                    onChange={(e) => setProcessingMode(e.target.value)}
-                    className="mr-3"
-                  />
-                  <div>
-                    <span className="font-medium">Force All</span>
-                    <p className="text-sm text-gray-600">Reprocess everything, even products that are already enriched</p>
+        </div>
+
+        {products.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏷️ Thrivera Collections & Google Shopping</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(collectionTags).map(([collection, data]) => (
+                <div key={collection} className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h3 className="font-medium text-green-900 mb-2">{collection}</h3>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {data.tags.map(tag => (
+                      <span key={tag} className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
-                </label>
+                  <p className="text-xs text-green-700 mb-1">
+                    Auto-detected by: {data.keywords.slice(0, 3).join(', ')}...
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Google Category: {googleShoppingData[collection]?.category.split(' > ').pop()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {enrichedCount > 0 && (
+          <>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <div className="flex gap-4 items-center">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <input
+                      type="text"
+                      placeholder="Search products..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="all">All Products</option>
+                    <option value="enriched">Processed</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => exportEnrichedData(false)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2 transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export for Shopify
+                  </button>
+                  <button
+                    onClick={() => exportEnrichedData(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export with Tracking
+                  </button>
+                </div>
               </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Processed Products ({filteredProducts.length})
+                </h2>
+              </div>
+              <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+               {filteredProducts.length === 0 ? (
+                 <div className="p-6 text-center text-gray-500">
+                   {searchTerm || filterStatus !== 'all' ? 'No products match your search criteria.' : 'No processed products to display.'}
+                 </div>
+               ) : (
+                filteredProducts.map((product, index) => (
+                  <div key={`${product.id}-${index}`} className="p-6">
+                     <div className="flex items-start justify-between mb-4">
+                       <div className="flex-1">
+                         <div className="flex items-center gap-3 mb-2">
+                           <h3 className="text-lg font-medium text-gray-900">
+                             {product.Title?.trim() || product.Handle || `Product ${product.id || 'Unknown'}`}
+                           </h3>
+                           {product.enriched && (
+                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                               <Check className="h-3 w-3 mr-1" />
+                               {product.detectedCollection}
+                             </span>
+                           )}
+                         </div>
+                         
+                         {product.Vendor && (
+                           <p className="text-sm text-gray-500 mb-2">Vendor: {product.Vendor}</p>
+                         )}
+                         
+                         {product.enriched && (
+                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+                             <div>
+                               <h4 className="text-sm font-medium text-gray-700 mb-2">Original Description</h4>
+                               <div className="bg-gray-50 border rounded-md p-3 text-sm text-gray-600 max-h-32 overflow-y-auto">
+                                 {product.originalDescription.replace(/<[^>]*>/g, '') || 'No description'}
+                               </div>
+                             </div>
+                             
+                             <div>
+                               <h4 className="text-sm font-medium text-green-700 mb-2">Thrivera Description</h4>
+                               <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-800 max-h-32 overflow-y-auto">
+                                 {product.newDescription}
+                               </div>
+                             </div>
+                             
+                             <div>
+                               <h4 className="text-sm font-medium text-gray-700 mb-2">Collection Tags</h4>
+                               <div className="flex flex-wrap gap-1">
+                                 {product.newTags.split(', ').map(tag => (
+                                   <span key={tag} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                                     {tag}
+                                   </span>
+                                 ))}
+                               </div>
+                             </div>
+                             
+                             <div>
+                               <h4 className="text-sm font-medium text-gray-700 mb-2">SEO Content</h4>
+                               <div className="text-xs text-gray-600 space-y-1">
+                                 <div><strong>Title:</strong> {product.newSeoTitle}</div>
+                                 <div><strong>Description:</strong> {product.newSeoDescription}</div>
+                               </div>
+                             </div>
+
+                             <div className="lg:col-span-2">
+                               <h4 className="text-sm font-medium text-blue-700 mb-2">Google Shopping Data</h4>
+                               <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-blue-800 space-y-1">
+                                 <div><strong>Category:</strong> {product['Google Shopping / Google Product Category']}</div>
+                                 <div><strong>Gender:</strong> {product['Google Shopping / Gender']} | <strong>Condition:</strong> {product['Google Shopping / Condition']}</div>
+                                 <div><strong>Labels:</strong> {product['Google Shopping / Custom Label 0']}, {product['Google Shopping / Custom Label 1']}, {product['Google Shopping / Custom Label 4']}</div>
+                               </div>
+                             </div>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   </div>
+                 ))
+               )}
+             </div>
+           </div>
+         </>
+       )}
+
+       <div className="mt-8 text-center text-sm text-gray-500">
+         <p>Thrivera Product Enrichment Tool - Built with wellness in mind 🌿</p>
+       </div>
+     </div>
+   </div>
+  );
+};
+
+export default App;
