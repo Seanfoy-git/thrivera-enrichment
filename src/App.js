@@ -971,14 +971,8 @@ Write only the product description, no titles or extra text.`;
   );
 };
 
-export default App;value)}
-                  />
-                  Smart Mode - Skip already enriched products
-                </label>
+export default App;
+                  
+                 
+               
                 
-                <label style={{ display: 'block', marginBottom: '10px' }}>
-                  <input 
-                    type="radio" 
-                    value="force" 
-                    checked={processingMode === 'force'}
-                    onChange={(e) => setProcessingMode(e.target.
