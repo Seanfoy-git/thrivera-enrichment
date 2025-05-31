@@ -55,6 +55,7 @@ const App = () => {
       customLabel3: "comfort"
     }
   };
+
   const isAlreadyEnriched = (product) => {
     const description = (product['Body (HTML)'] || '').toLowerCase();
     const tags = (product.Tags || '').toLowerCase();
@@ -76,7 +77,6 @@ const App = () => {
     
     return hasThriveraVoice || hasOurTags;
   };
-
 
   // Thrivera Brand Voice Templates
   const thriveraVoice = {
@@ -142,39 +142,37 @@ const App = () => {
   };
 
   // Generate Thrivera Description - retaining all vendor details
-const generateThriveraDescription = async (product, collection) => {
-  const originalDesc = (product['Body (HTML)'] || '').replace(/<[^>]*>/g, '').trim();
-  
-  try {
-    const aiDescription = await generateAIDescription(product, collection, originalDesc);
-    const finalDescription = ensureThriveraVoice(aiDescription, collection);
-    return finalDescription;
+  const generateThriveraDescription = async (product, collection) => {
+    const originalDesc = (product['Body (HTML)'] || '').replace(/<[^>]*>/g, '').trim();
     
-  } catch (error) {
-    console.error('OpenAI generation failed, using fallback:', error);
-    return generateFallbackDescription(product, collection, originalDesc);
-  }
-};
-// ADD THIS: OpenAI API function
-const generateAIDescription = async (product, collection, originalDesc) => {
-  const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
-  
-  if (!apiKey) {
-    throw new Error('OpenAI API key not found');
-  }
-
-  // Remove this line after debugging - it's exposing your API key!
-  // console.log('API Key present:', apiKey ? 'YES' : 'NO', 'Length:', apiKey?.length || 0);
-
-  const collectionGuidance = {
-    'Mind and Mood': 'Focus on mental wellness, tranquility, mindfulness, and emotional balance. Use calming, nurturing language.',
-    'Movement and Flow': 'Emphasize active wellness, body support, mobility, and movement freedom. Use encouraging, supportive language.',
-    'Rest and Sleep': 'Highlight sleep quality, peaceful rest, comfort, and nighttime wellness. Use soothing, gentle language.',
-    'Supportive Living': 'Focus on independence, confidence, daily support, and life enhancement. Use empowering, caring language.',
-    'Everyday Comforts': 'Emphasize daily comfort, ease of use, gentle support, and everyday wellness. Use warm, comforting language.'
+    try {
+      const aiDescription = await generateAIDescription(product, collection, originalDesc);
+      const finalDescription = ensureThriveraVoice(aiDescription, collection);
+      return finalDescription;
+      
+    } catch (error) {
+      console.error('OpenAI generation failed, using fallback:', error);
+      return generateFallbackDescription(product, collection, originalDesc);
+    }
   };
 
-const prompt = `Transform this product description into Thrivera's wellness-focused voice. Keep all specific details like size, color, flavor, scent, material, dimensions, or technical specifications from the original.
+  // OpenAI API function
+  const generateAIDescription = async (product, collection, originalDesc) => {
+    const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('OpenAI API key not found');
+    }
+
+    const collectionGuidance = {
+      'Mind and Mood': 'Focus on mental wellness, tranquility, mindfulness, and emotional balance. Use calming, nurturing language.',
+      'Movement and Flow': 'Emphasize active wellness, body support, mobility, and movement freedom. Use encouraging, supportive language.',
+      'Rest and Sleep': 'Highlight sleep quality, peaceful rest, comfort, and nighttime wellness. Use soothing, gentle language.',
+      'Supportive Living': 'Focus on independence, confidence, daily support, and life enhancement. Use empowering, caring language.',
+      'Everyday Comforts': 'Emphasize daily comfort, ease of use, gentle support, and everyday wellness. Use warm, comforting language.'
+    };
+
+    const prompt = `Transform this product description into Thrivera's wellness-focused voice. Keep all specific details like size, color, flavor, scent, material, dimensions, or technical specifications from the original.
 
 Original Product: ${product.Title}
 Original Description: ${originalDesc}
@@ -193,83 +191,85 @@ Create a description that:
 - Ends with "Experience the Thrivera difference."
 
 Write only the product description, no titles or extra text.`;
-  console.log('Making OpenAI API request for:', product.Title);
+    
+    console.log('Making OpenAI API request for:', product.Title);
 
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey.trim()}` // Added .trim() to remove any whitespace
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 150,
-        temperature: 0.7
-      })
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.trim()}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 150,
+          temperature: 0.7
+        })
+      });
+
+      console.log('OpenAI Response Status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('OpenAI API Error Details:', errorData);
+        throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+      }
+
+      const data = await response.json();
+      console.log('OpenAI Success for:', product.Title);
+      return data.choices[0].message.content.trim();
+      
+    } catch (error) {
+      console.error('OpenAI API Call Failed:', error);
+      throw error;
+    }
+  };
+
+  // Voice consistency function
+  const ensureThriveraVoice = (description, collection) => {
+    const voiceTransforms = {
+      'high-quality': 'mindfully crafted',
+      'premium': 'thoughtfully designed',
+      'excellent': 'beautifully crafted',
+      'helps': 'gently supports',
+      'provides': 'nurtures you with',
+      'comfortable': 'gently supportive',
+      'effective': 'naturally beneficial',
+      'perfect': 'beautifully suited',
+      'great': 'wonderfully supportive'
+    };
+
+    let enhancedDesc = description;
+    
+    Object.keys(voiceTransforms).forEach(original => {
+      const regex = new RegExp(`\\b${original}\\b`, 'gi');
+      enhancedDesc = enhancedDesc.replace(regex, voiceTransforms[original]);
     });
 
-    console.log('OpenAI Response Status:', response.status);
-    
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenAI API Error Details:', errorData);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+    if (!enhancedDesc.trim().endsWith('.')) {
+      enhancedDesc += '.';
     }
 
-    const data = await response.json();
-    console.log('OpenAI Success for:', product.Title);
-    return data.choices[0].message.content.trim();
+    return enhancedDesc;
+  };
+
+  // Fallback function
+  const generateFallbackDescription = (product, collection) => {
+    const productName = product.Title?.toLowerCase() || 'wellness essential';
     
-  } catch (error) {
-    console.error('OpenAI API Call Failed:', error);
-    throw error;
-  }
-};
+    const fallbackTemplates = {
+      'Mind and Mood': `Nurture your mental wellness with this thoughtfully designed ${productName}. Mindfully crafted to support your daily tranquility.`,
+      'Movement and Flow': `Support your active lifestyle with this gently effective ${productName}. Beautifully designed to enhance your movement.`,
+      'Rest and Sleep': `Create your peaceful sanctuary with this lovingly made ${productName}. Thoughtfully designed to support restful sleep.`,
+      'Supportive Living': `Enhance your daily confidence with this reliably supportive ${productName}. Mindfully crafted to nurture your independence.`,
+      'Everyday Comforts': `Embrace daily comfort with this gently supportive ${productName}. Thoughtfully designed to enhance your wellness routine.`
+    };
 
-// ADD THIS: Voice consistency function
-const ensureThriveraVoice = (description, collection) => {
-  const voiceTransforms = {
-    'high-quality': 'mindfully crafted',
-    'premium': 'thoughtfully designed',
-    'excellent': 'beautifully crafted',
-    'helps': 'gently supports',
-    'provides': 'nurtures you with',
-    'comfortable': 'gently supportive',
-    'effective': 'naturally beneficial',
-    'perfect': 'beautifully suited',
-    'great': 'wonderfully supportive'
+    return fallbackTemplates[collection] || fallbackTemplates['Everyday Comforts'];
   };
 
-  let enhancedDesc = description;
-  
-  Object.keys(voiceTransforms).forEach(original => {
-    const regex = new RegExp(`\\b${original}\\b`, 'gi');
-    enhancedDesc = enhancedDesc.replace(regex, voiceTransforms[original]);
-  });
-
-  if (!enhancedDesc.trim().endsWith('.')) {
-    enhancedDesc += '.';
-  }
-
-  return enhancedDesc;
-};
-
-// ADD THIS: Fallback function
-const generateFallbackDescription = (product, collection) => {
-  const productName = product.Title?.toLowerCase() || 'wellness essential';
-  
-  const fallbackTemplates = {
-    'Mind and Mood': `Nurture your mental wellness with this thoughtfully designed ${productName}. Mindfully crafted to support your daily tranquility.`,
-    'Movement and Flow': `Support your active lifestyle with this gently effective ${productName}. Beautifully designed to enhance your movement.`,
-    'Rest and Sleep': `Create your peaceful sanctuary with this lovingly made ${productName}. Thoughtfully designed to support restful sleep.`,
-    'Supportive Living': `Enhance your daily confidence with this reliably supportive ${productName}. Mindfully crafted to nurture your independence.`,
-    'Everyday Comforts': `Embrace daily comfort with this gently supportive ${productName}. Thoughtfully designed to enhance your wellness routine.`
-  };
-
-  return fallbackTemplates[collection] || fallbackTemplates['Everyday Comforts'];
-};
   // Generate SEO Content with Thrivera differentiation
   const generateSEO = (product, collection) => {
     const productName = product.Title?.trim() || product.Handle || 'Wellness Product';
@@ -336,106 +336,106 @@ const generateFallbackDescription = (product, collection) => {
     };
   };
 
- // Process all products automatically
-const processAllProducts = useCallback(async () => {
-  if (products.length === 0) return;
-  
-  setProcessing(true);
-  setUploadError('');
-  setCancelProcessing(false);
-  
-  // Initialize progress tracking
-  setProcessingStats({
-    total: products.length,
-    current: 0,
-    currentProduct: '',
-    toProcess: products.length,
-    alreadyEnriched: 0
-  });
-  
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1500));
+  // Process all products automatically
+  const processAllProducts = useCallback(async () => {
+    if (products.length === 0) return;
     
-    // Process products one by one to avoid overwhelming the API
-    const processedProducts = [];
+    setProcessing(true);
+    setUploadError('');
+    setCancelProcessing(false);
     
-    for (let i = 0; i < products.length; i++) {
-      // Check if user cancelled
-      if (cancelProcessing) {
-        console.log('Processing cancelled by user at product', i + 1);
-        break;
-      }
+    // Initialize progress tracking
+    setProcessingStats({
+      total: products.length,
+      current: 0,
+      currentProduct: '',
+      toProcess: products.length,
+      alreadyEnriched: 0
+    });
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      const product = products[i];
+      // Process products one by one to avoid overwhelming the API
+      const processedProducts = [];
       
-      // Update progress
-      setProcessingStats(prev => ({
-        ...prev,
-        current: i + 1,
-        currentProduct: product.Title || `Product ${i + 1}`
-      }));
-      
-      try {
-        console.log(`Processing product ${i + 1}:`, product.Title);
-        
-        const detectedCollection = detectCollection(product.Title, product['Body (HTML)'] || '');
-        console.log('Detected collection:', detectedCollection);
-        
-        const newDescription = await generateThriveraDescription(product, detectedCollection);
-        const seoContent = generateSEO(product, detectedCollection);
-        
-        console.log('About to generate Google Shopping data...');
-        const googleShopping = generateGoogleShopping(product, detectedCollection);
-        console.log('Google Shopping data generated:', googleShopping);
-        
-        const newTags = collectionTags[detectedCollection].tags.join(', ');
-        
-        const result = {
-          ...product,
-          enriched: true,
-          enrichedAt: new Date().toISOString(),
-          detectedCollection,
-          originalDescription: product['Body (HTML)'] || '',
-          originalTags: product.Tags || '',
-          originalSeoTitle: product['SEO Title'] || '',
-          originalSeoDescription: product['SEO Description'] || '',
-          newDescription,
-          newTags,
-          newSeoTitle: seoContent.title,
-          newSeoDescription: seoContent.description,
-          ...googleShopping
-        };
-        
-        console.log('Final product result for', product.Title, ':', result);
-        processedProducts.push(result);
-        
-        // Small delay between products to be nice to the API
-        if (i < products.length - 1 && !cancelProcessing) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+      for (let i = 0; i < products.length; i++) {
+        // Check if user cancelled
+        if (cancelProcessing) {
+          console.log('Processing cancelled by user at product', i + 1);
+          break;
         }
         
-      } catch (error) {
-        console.error('Error processing product:', product.Title, error);
-        processedProducts.push(product); // Add original product if processing fails
+        const product = products[i];
+        
+        // Update progress
+        setProcessingStats(prev => ({
+          ...prev,
+          current: i + 1,
+          currentProduct: product.Title || `Product ${i + 1}`
+        }));
+        
+        try {
+          console.log(`Processing product ${i + 1}:`, product.Title);
+          
+          const detectedCollection = detectCollection(product.Title, product['Body (HTML)'] || '');
+          console.log('Detected collection:', detectedCollection);
+          
+          const newDescription = await generateThriveraDescription(product, detectedCollection);
+          const seoContent = generateSEO(product, detectedCollection);
+          
+          console.log('About to generate Google Shopping data...');
+          const googleShopping = generateGoogleShopping(product, detectedCollection);
+          console.log('Google Shopping data generated:', googleShopping);
+          
+          const newTags = collectionTags[detectedCollection].tags.join(', ');
+          
+          const result = {
+            ...product,
+            enriched: true,
+            enrichedAt: new Date().toISOString(),
+            detectedCollection,
+            originalDescription: product['Body (HTML)'] || '',
+            originalTags: product.Tags || '',
+            originalSeoTitle: product['SEO Title'] || '',
+            originalSeoDescription: product['SEO Description'] || '',
+            newDescription,
+            newTags,
+            newSeoTitle: seoContent.title,
+            newSeoDescription: seoContent.description,
+            ...googleShopping
+          };
+          
+          console.log('Final product result for', product.Title, ':', result);
+          processedProducts.push(result);
+          
+          // Small delay between products to be nice to the API
+          if (i < products.length - 1 && !cancelProcessing) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+        } catch (error) {
+          console.error('Error processing product:', product.Title, error);
+          processedProducts.push(product); // Add original product if processing fails
+        }
       }
+      
+      // Add any remaining unprocessed products
+      const remainingProducts = products.slice(processedProducts.length);
+      processedProducts.push(...remainingProducts);
+      
+      setProducts(processedProducts);
+      console.log('Processing completed for', processedProducts.filter(p => p.enriched).length, 'products');
+      
+    } catch (error) {
+      console.error('Processing error:', error);
+      setUploadError('Error processing products: ' + error.message);
+    } finally {
+      setProcessing(false);
+      setCancelProcessing(false);
+      setProcessingStats({ total: 0, current: 0, currentProduct: '', toProcess: 0, alreadyEnriched: 0 });
     }
-    
-    // Add any remaining unprocessed products
-    const remainingProducts = products.slice(processedProducts.length);
-    processedProducts.push(...remainingProducts);
-    
-    setProducts(processedProducts);
-    console.log('Processing completed for', processedProducts.filter(p => p.enriched).length, 'products');
-    
-  } catch (error) {
-    console.error('Processing error:', error);
-    setUploadError('Error processing products: ' + error.message);
-  } finally {
-    setProcessing(false);
-    setCancelProcessing(false);
-    setProcessingStats({ total: 0, current: 0, currentProduct: '', toProcess: 0, alreadyEnriched: 0 });
-  }
-}, [products, cancelProcessing]);
+  }, [products, cancelProcessing]);
 
   // Handle file upload - Fixed for variants
   const handleFileUpload = useCallback((event) => {
@@ -669,36 +669,27 @@ const processAllProducts = useCallback(async () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
-             <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-  🌿 Thrivera Product Enrichment
-  </h1>
-<p className="text-gray-600">Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                🌿 Thrivera Product Enrichment
+              </h1>
+              <p className="text-gray-600">
+                Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.
+              </p>
 
-{/* Processing Mode Section */}
-<div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginTop: '20px' }}>
-  <h3>Processing Mode</h3>
-  
-  <label style={{ display: 'block', marginBottom: '10px' }}>
-    <input 
-      type="radio" 
-      value="smart" 
-      checked={processingMode === 'smart'}
-      onChange={(e) => setProcessingMode(e.target.value)}
-    />
-    Smart Mode - Skip already enriched products
-  </label>
-  
-  <label style={{ display: 'block', marginBottom: '10px' }}>
-    <input 
-      type="radio" 
-      value="force" 
-      checked={processingMode === 'force'}
-      onChange={(e) => setProcessingMode(e.target.value)}
-    />
-    Force All - Reprocess everything
-  </label>
-</div>
-</div>
+              {/* Processing Mode Section */}
+              <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginTop: '20px' }}>
+                <h3>Processing Mode</h3>
+                
+                <label style={{ display: 'block', marginBottom: '10px' }}>
+                  <input 
+                    type="radio" 
+                    value="smart" 
+                    checked={processingMode === 'smart'}
+                    onChange={(e) => setProcessingMode(e.target.value)}
+                  />
+                  Force All - Reprocess everything
+                </label>
+              </div>
             </div>
             {totalCount > 0 && (
               <button
@@ -893,7 +884,7 @@ const processAllProducts = useCallback(async () => {
                  </div>
                ) : (
                 filteredProducts.map((product, index) => (
-  <div key={`${product.id}-${index}`} className="p-6">
+                  <div key={`${product.id}-${index}`} className="p-6">
                      <div className="flex items-start justify-between mb-4">
                        <div className="flex-1">
                          <div className="flex items-center gap-3 mb-2">
@@ -977,7 +968,17 @@ const processAllProducts = useCallback(async () => {
        </div>
      </div>
    </div>
-);
+  );
 };
 
-export default App;
+export default App;value)}
+                  />
+                  Smart Mode - Skip already enriched products
+                </label>
+                
+                <label style={{ display: 'block', marginBottom: '10px' }}>
+                  <input 
+                    type="radio" 
+                    value="force" 
+                    checked={processingMode === 'force'}
+                    onChange={(e) => setProcessingMode(e.target.
