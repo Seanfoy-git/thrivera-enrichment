@@ -210,8 +210,8 @@ const generateAIDescription = async (product, collection, originalDesc) => {
 
 const prompt = `Transform this product description into Thrivera's wellness-focused voice. Keep all specific details like size, color, flavor, scent, material, dimensions, or technical specifications from the original.
 
-Original Product: ${title}
-Original Description: ${originalDescription}
+Original Product: ${product.Title}
+Original Description: ${originalDesc}
 Collection: ${collection}
 
 IMPORTANT: DO NOT start with "Indulge" - this word is overused. Instead start with: "Discover," "Experience," "Embrace," "Enjoy," "Find," "Create," or "Welcome."
@@ -227,7 +227,6 @@ Create a description that:
 - Ends with "Experience the Thrivera difference."
 
 Write only the product description, no titles or extra text.`;
-
   console.log('Making OpenAI API request for:', product.Title);
 
   try {
