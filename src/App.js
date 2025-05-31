@@ -94,48 +94,14 @@ const App = () => {
   const [processingMode, setProcessingMode] = useState('smart');
   const [processingStats, setProcessingStats] = useState({ 
     total: 0, 
+    current: 0,
+    currentProduct: '',
     toProcess: 0, 
     alreadyEnriched: 0 
   });
+  const [cancelProcessing, setCancelProcessing] = useState(false);
 
-  // Load settings from localStorage on startup
-  useEffect(() => {
-    try {
-      const savedProducts = localStorage.getItem('thrivera-products');
-      if (savedProducts) {
-        const parsed = JSON.parse(savedProducts);
-        setProducts(parsed);
-        setFilteredProducts(parsed);
-        console.log('Loaded', parsed.length, 'products from storage');
-      }
-    } catch (error) {
-      console.error('Error loading saved products:', error);
-      localStorage.removeItem('thrivera-products');
-    }
-  }, []);
-
-  // Save products to localStorage whenever products change
-  useEffect(() => {
-    if (products.length > 0) {
-      try {
-        localStorage.setItem('thrivera-products', JSON.stringify(products));
-        console.log('Saved', products.length, 'products to storage');
-      } catch (error) {
-        console.error('Error saving products:', error);
-      }
-    }
-  }, [products]);
-
-  // Clear all data
-  const clearAllData = () => {
-    if (window.confirm('Are you sure you want to clear all products? This cannot be undone.')) {
-      setProducts([]);
-      setFilteredProducts([]);
-      localStorage.removeItem('thrivera-products');
-    }
-  };
-
- // Collection Detection Function
+  // Collection Detection Function
   const detectCollection = (title, description) => {
     const text = `${title} ${description}`.toLowerCase();
     
@@ -376,6 +342,16 @@ const processAllProducts = useCallback(async () => {
   
   setProcessing(true);
   setUploadError('');
+  setCancelProcessing(false);
+  
+  // Initialize progress tracking
+  setProcessingStats({
+    total: products.length,
+    current: 0,
+    currentProduct: '',
+    toProcess: products.length,
+    alreadyEnriched: 0
+  });
   
   try {
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -384,12 +360,25 @@ const processAllProducts = useCallback(async () => {
     const processedProducts = [];
     
     for (let i = 0; i < products.length; i++) {
+      // Check if user cancelled
+      if (cancelProcessing) {
+        console.log('Processing cancelled by user at product', i + 1);
+        break;
+      }
+      
       const product = products[i];
+      
+      // Update progress
+      setProcessingStats(prev => ({
+        ...prev,
+        current: i + 1,
+        currentProduct: product.Title || `Product ${i + 1}`
+      }));
       
       try {
         console.log(`Processing product ${i + 1}:`, product.Title);
         
-        const detectedCollection = detectCollection(product);
+        const detectedCollection = detectCollection(product.Title, product['Body (HTML)'] || '');
         console.log('Detected collection:', detectedCollection);
         
         const newDescription = await generateThriveraDescription(product, detectedCollection);
@@ -421,7 +410,7 @@ const processAllProducts = useCallback(async () => {
         processedProducts.push(result);
         
         // Small delay between products to be nice to the API
-        if (i < products.length - 1) {
+        if (i < products.length - 1 && !cancelProcessing) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
@@ -431,16 +420,22 @@ const processAllProducts = useCallback(async () => {
       }
     }
     
+    // Add any remaining unprocessed products
+    const remainingProducts = products.slice(processedProducts.length);
+    processedProducts.push(...remainingProducts);
+    
     setProducts(processedProducts);
-    console.log('Processing completed for', processedProducts.length, 'products');
+    console.log('Processing completed for', processedProducts.filter(p => p.enriched).length, 'products');
     
   } catch (error) {
     console.error('Processing error:', error);
     setUploadError('Error processing products: ' + error.message);
   } finally {
     setProcessing(false);
+    setCancelProcessing(false);
+    setProcessingStats({ total: 0, current: 0, currentProduct: '', toProcess: 0, alreadyEnriched: 0 });
   }
-}, [products]);
+}, [products, cancelProcessing]);
 
   // Handle file upload - Fixed for variants
   const handleFileUpload = useCallback((event) => {
@@ -711,7 +706,12 @@ const processAllProducts = useCallback(async () => {
             </div>
             {totalCount > 0 && (
               <button
-                onClick={clearAllData}
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to clear all products? This cannot be undone.')) {
+                    setProducts([]);
+                    setFilteredProducts([]);
+                  }
+                }}
                 className="text-red-600 hover:text-red-800 flex items-center gap-2 text-sm"
                 title="Clear all products"
               >
@@ -740,7 +740,7 @@ const processAllProducts = useCallback(async () => {
             </div>
           )}
           
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-thrivera-green transition-colors">
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition-colors">
             <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <label htmlFor="file-upload" className="cursor-pointer">
               <span className="mt-2 block text-sm font-medium text-gray-900">
@@ -761,23 +761,52 @@ const processAllProducts = useCallback(async () => {
           
           {products.length > 0 && !enrichedCount && (
             <div className="mt-6 text-center">
-              <button
-                onClick={processAllProducts}
-                disabled={processing}
-                className="bg-thrivera-green text-white px-6 py-3 rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed flex items-center gap-2 mx-auto transition-colors"
-              >
-                {processing ? (
-                  <>
+              {!processing ? (
+                <button
+                  onClick={processAllProducts}
+                  className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 flex items-center gap-2 mx-auto transition-colors"
+                >
+                  <Wand2 className="h-5 w-5" />
+                  Process All Products with Thrivera Voice + Google Shopping
+                </button>
+              ) : (
+                <div className="flex flex-col items-center gap-4">
+                  {/* Progress Bar */}
+                  <div className="w-full max-w-md">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Processing Products</span>
+                      <span>{processingStats.current} of {processingStats.total}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="bg-green-600 h-3 rounded-full transition-all duration-300" 
+                        style={{ 
+                          width: `${processingStats.total > 0 ? (processingStats.current / processingStats.total) * 100 : 0}%` 
+                        }}
+                      ></div>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-2 text-center">
+                      {processingStats.currentProduct && (
+                        <span>Currently processing: <strong>{processingStats.currentProduct}</strong></span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Status */}
+                  <div className="flex items-center gap-2 text-green-600">
                     <RefreshCw className="h-5 w-5 animate-spin" />
-                    Processing {totalCount} Products...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="h-5 w-5" />
-                    Process All Products with Thrivera Voice + Google Shopping
-                  </>
-                )}
-              </button>
+                    <span>Processing... ({Math.round((processingStats.current / processingStats.total) * 100)}% complete)</span>
+                  </div>
+                  
+                  {/* Cancel Button */}
+                  <button
+                    onClick={() => setCancelProcessing(true)}
+                    className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center gap-2 transition-colors"
+                  >
+                    Cancel Processing
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -788,7 +817,7 @@ const processAllProducts = useCallback(async () => {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">🏷️ Thrivera Collections & Google Shopping</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(collectionTags).map(([collection, data]) => (
-                <div key={collection} className="bg-thrivera-light border border-green-200 rounded-lg p-4">
+                <div key={collection} className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <h3 className="font-medium text-green-900 mb-2">{collection}</h3>
                   <div className="flex flex-wrap gap-1 mb-2">
                     {data.tags.map(tag => (
@@ -822,13 +851,13 @@ const processAllProducts = useCallback(async () => {
                       placeholder="Search products..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-thrivera-green"
+                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-thrivera-green"
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
                     <option value="all">All Products</option>
                     <option value="enriched">Processed</option>
@@ -838,7 +867,7 @@ const processAllProducts = useCallback(async () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => exportEnrichedData(false)}
-                    className="bg-thrivera-green text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2 transition-colors"
+                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2 transition-colors"
                   >
                     <Download className="h-4 w-4" />
                     Export for Shopify
@@ -900,7 +929,7 @@ const processAllProducts = useCallback(async () => {
                              {/* Thrivera Version */}
                              <div>
                                <h4 className="text-sm font-medium text-green-700 mb-2">Thrivera Description</h4>
-                               <div className="bg-thrivera-light border border-green-200 rounded-md p-3 text-sm text-green-800 max-h-32 overflow-y-auto">
+                               <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-800 max-h-32 overflow-y-auto">
                                  {product.newDescription}
                                </div>
                              </div>
@@ -951,6 +980,7 @@ const processAllProducts = useCallback(async () => {
          <p>Thrivera Product Enrichment Tool - Built with wellness in mind 🌿</p>
        </div>
      </div>
+   </div>
 );
 };
 
