@@ -139,23 +139,70 @@ const App = () => {
       throw new Error('OpenAI API key not found');
     }
 
-    const prompt = `Transform this product description into Thrivera's wellness-focused voice. Keep all specific details like size, color, flavor, scent, material, dimensions, or technical specifications from the original.
+    // Get product specifications to preserve
+    const productTitle = product.Title || '';
+    const productType = product['Product Type'] || '';
+    const vendor = product.Vendor || '';
+    const tags = product.Tags || '';
+    const variantTitle = product['Variant Title'] || '';
+    const option1Name = product['Option1 Name'] || '';
+    const option1Value = product['Option1 Value'] || '';
+    const option2Name = product['Option2 Name'] || '';
+    const option2Value = product['Option2 Value'] || '';
+    const option3Name = product['Option3 Name'] || '';
+    const option3Value = product['Option3 Value'] || '';
 
-Original Product: ${product.Title}
-Original Description: ${originalDesc}
-Collection: ${collection}
+    // Create different prompt templates for variety
+    const promptTemplates = [
+      {
+        starter: "Discover",
+        focus: "wellness benefits and daily life enhancement",
+        tone: "warm and inviting"
+      },
+      {
+        starter: "Experience",
+        focus: "transformative qualities and mindful living",
+        tone: "inspiring and uplifting"
+      },
+      {
+        starter: "Embrace",
+        focus: "comfort and well-being",
+        tone: "nurturing and supportive"
+      },
+      {
+        starter: "Welcome",
+        focus: "peaceful moments and self-care",
+        tone: "gentle and caring"
+      },
+      {
+        starter: "Find",
+        focus: "balance and harmony in daily routines",
+        tone: "encouraging and empowering"
+      }
+    ];
 
-IMPORTANT: DO NOT start with "Indulge" - this word is overused. Instead start with: "Discover," "Experience," "Embrace," "Enjoy," "Find," "Create," or "Welcome."
+    // Randomly select a template for variety
+    const template = promptTemplates[Math.floor(Math.random() * promptTemplates.length)];
 
-Create a description that:
-- NEVER starts with "Indulge" or uses "indulge" anywhere
-- Focuses on wellness benefits and how it enhances daily life
-- Uses warm, inclusive, supportive language
-- Uses varied opening words like "Discover," "Experience," "Embrace," "Enjoy," "Find," "Create"
-- Keeps ALL specific product details (size, color, flavor, scent, material, etc.)
-- Mentions the collection context (${collection})
-- Is 2-3 paragraphs, around 150-200 words
-- Ends with "Experience the Thrivera difference."
+    const prompt = `Transform this product description into Thrivera's wellness-focused voice using a ${template.tone} tone.
+
+PRODUCT DETAILS TO PRESERVE:
+- Title: ${productTitle}
+- Type: ${productType}
+- Vendor: ${vendor}
+- Original Description: ${originalDesc}
+- Product Specifications: ${variantTitle} ${option1Name}: ${option1Value} ${option2Name}: ${option2Value} ${option3Name}: ${option3Value}
+- Collection Context: ${collection}
+
+WRITING REQUIREMENTS:
+- Start with "${template.starter}" (not "Indulge")
+- Focus on ${template.focus}
+- Keep ALL specific product details (size, color, flavor, scent, material, dimensions, etc.)
+- Use ${template.tone} language
+- Mention how it fits into the ${collection} wellness collection
+- Write 2-3 paragraphs, 150-200 words
+- End with "Experience the Thrivera difference."
+- Make it unique and avoid generic wellness language
 
 Write only the product description, no titles or extra text.`;
     
@@ -171,8 +218,8 @@ Write only the product description, no titles or extra text.`;
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
           messages: [{ role: 'user', content: prompt }],
-          max_tokens: 150,
-          temperature: 0.7
+          max_tokens: 200,
+          temperature: 0.8 // Increased for more variety
         })
       });
 
@@ -264,6 +311,12 @@ Write only the product description, no titles or extra text.`;
       'Google Shopping / Custom Label 3': shoppingData.customLabel3,
       'Google Shopping / Custom Label 4': 'thrivera-wellness'
     };
+  };
+
+  // Handle cancel processing - FIXED
+  const handleCancelProcessing = () => {
+    setCancelProcessing(true);
+    console.log('Cancel processing requested');
   };
 
   // Process all products automatically
@@ -369,7 +422,7 @@ Write only the product description, no titles or extra text.`;
       setCancelProcessing(false);
       setProcessingStats({ total: 0, current: 0, currentProduct: '', toProcess: 0, alreadyEnriched: 0 });
     }
-  }, [products, cancelProcessing, processingMode]);
+  }, [products, processingMode, cancelProcessing]);
 
   // Handle file upload
   const handleFileUpload = useCallback((event) => {
@@ -708,7 +761,7 @@ Write only the product description, no titles or extra text.`;
                 </div>
                 
                 <button
-                  onClick={() => setCancelProcessing(true)}
+                  onClick={handleCancelProcessing}
                   className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 flex items-center gap-2 transition-colors"
                   disabled={cancelProcessing}
                 >
