@@ -156,6 +156,176 @@ const App = () => {
     return `Premium ${product.Title || 'product'} for your wellness journey.`;
   };
 
+  // Function to detect existing GTIN from CSV columns
+  const getExistingGTIN = (product) => {
+    // Try different possible column names for GTIN/UPC/EAN/ISBN
+    const possibleGTINColumns = [
+      'GTIN',
+      'UPC',
+      'EAN',
+      'ISBN',
+      'Barcode',
+      'Product Code',
+      'SKU',
+      'Variant Barcode',
+      'Variant SKU',
+      'Global Trade Item Number'
+    ];
+    
+    for (const col of possibleGTINColumns) {
+      if (product[col] && product[col].toString().trim()) {
+        const gtin = product[col].toString().trim();
+        // Basic validation - GTINs should be 8, 12, 13, or 14 digits
+        if (/^\d{8}$|^\d{12}$|^\d{13}$|^\d{14}$/.test(gtin)) {
+          return gtin;
+        }
+      }
+    }
+    
+    return null;
+  };
+
+  // Function to search for GTIN using product information
+  const searchForGTIN = async (product) => {
+    // First check if GTIN already exists in the data
+    const existingGTIN = getExistingGTIN(product);
+    if (existingGTIN) {
+      return existingGTIN;
+    }
+
+    // Try to search for GTIN using product details
+    const productTitle = product.Title || '';
+    const vendor = product.Vendor || '';
+    const productType = product['Product Type'] || '';
+    const sku = product['Variant SKU'] || product.SKU || '';
+    
+    console.log(`🔍 Searching for GTIN: ${productTitle} by ${vendor}`);
+    
+    // Method 1: Try UPC Database API (if API key available)
+    try {
+      const upcApiKey = process.env.REACT_APP_UPC_API_KEY;
+      if (upcApiKey) {
+        const searchQuery = `${vendor} ${productTitle}`.trim();
+        const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/search?s=${encodeURIComponent(searchQuery)}`, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (upcResponse.ok) {
+          const upcData = await upcResponse.json();
+          if (upcData.items && upcData.items.length > 0) {
+            const foundGTIN = upcData.items[0].upc;
+            console.log(`✅ Found GTIN via UPC Database: ${foundGTIN}`);
+            return foundGTIN;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('UPC Database search failed:', error.message);
+    }
+
+    // Method 2: Try Open Food Facts (for food/supplement products)
+    try {
+      if (productType.toLowerCase().includes('food') || 
+          productType.toLowerCase().includes('supplement') ||
+          productTitle.toLowerCase().includes('vitamin') ||
+          productTitle.toLowerCase().includes('protein')) {
+        
+        const searchQuery = `${productTitle}`.replace(/[^\w\s]/g, '').trim();
+        const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(searchQuery)}&search_simple=1&action=process&json=1`);
+        
+        if (offResponse.ok) {
+          const offData = await offResponse.json();
+          if (offData.products && offData.products.length > 0) {
+            const foundGTIN = offData.products[0].code;
+            if (foundGTIN && /^\d{8,14}$/.test(foundGTIN)) {
+              console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
+              return foundGTIN;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Open Food Facts search failed:', error.message);
+    }
+
+    // Method 3: Generate search suggestions for manual lookup
+    const searchSuggestions = generateSearchSuggestions(product);
+    
+    return {
+      status: 'LOOKUP_NEEDED',
+      searchSuggestions: searchSuggestions,
+      message: `Manual lookup needed - try searching: "${searchSuggestions[0]}"`
+    };
+  };
+
+  // Generate helpful search queries for manual GTIN lookup
+  const generateSearchSuggestions = (product) => {
+    const title = product.Title || '';
+    const vendor = product.Vendor || '';
+    const sku = product['Variant SKU'] || product.SKU || '';
+    const productType = product['Product Type'] || '';
+    
+    const suggestions = [];
+    
+    // Clean up product name for better search results
+    const cleanTitle = title.replace(/[^\w\s-]/g, '').trim();
+    const searchQuery = `${vendor} ${cleanTitle}`.trim();
+    
+    // Google Shopping (shows GTINs in product details)
+    suggestions.push({
+      site: 'Google Shopping',
+      query: `${searchQuery}`,
+      url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchQuery)}`,
+      tip: 'Look for "GTIN" or "UPC" in product details'
+    });
+    
+    // Amazon (shows ASIN and sometimes UPC)
+    suggestions.push({
+      site: 'Amazon',
+      query: `${searchQuery}`,
+      url: `https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`,
+      tip: 'Check product details for "UPC" or use ASIN lookup tools'
+    });
+    
+    // Walmart (often shows UPC clearly)
+    suggestions.push({
+      site: 'Walmart',
+      query: `${searchQuery}`,
+      url: `https://www.walmart.com/search?q=${encodeURIComponent(searchQuery)}`,
+      tip: 'UPC usually visible in product specifications'
+    });
+    
+    // Target (good UPC visibility)
+    suggestions.push({
+      site: 'Target',
+      query: `${searchQuery}`,
+      url: `https://www.target.com/s?searchTerm=${encodeURIComponent(searchQuery)}`,
+      tip: 'Look in "Product details" section for UPC'
+    });
+    
+    // Manufacturer website search
+    if (vendor) {
+      suggestions.push({
+        site: `${vendor} Official Site`,
+        query: `${cleanTitle}`,
+        url: `https://www.google.com/search?q=site:${vendor.toLowerCase().replace(/\s/g, '')}.com+${encodeURIComponent(cleanTitle)}`,
+        tip: 'Official product pages often show UPC/model numbers'
+      });
+    }
+    
+    // UPC lookup sites (reverse lookup if you find the UPC)
+    suggestions.push({
+      site: 'UPC Database',
+      query: `${searchQuery} UPC`,
+      url: `https://www.upcitemdb.com/upc/search?q=${encodeURIComponent(searchQuery)}`,
+      tip: 'Dedicated UPC database - paste found UPC to verify'
+    });
+    
+    return suggestions.slice(0, 4); // Return top 4 suggestions
+  };
+
   // OpenAI API function with better variety
   const generateAIDescription = async (product, collection, originalDesc) => {
     const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
@@ -292,7 +462,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
   };
 
   // Generate Google Shopping Data
-  const generateGoogleShopping = (product, collection) => {
+  const generateGoogleShopping = (product, collection, gtin = null) => {
     const title = (product.Title || '').toLowerCase();
     const price = parseFloat(product['Variant Price']) || 0;
     const vendor = product.Vendor || '';
@@ -310,6 +480,8 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
     
     const shoppingData = googleShoppingData[collection] || googleShoppingData["Everyday Comforts"];
     
+    // Note: Google Shopping settings are typically managed through Shopify's Google Shopping app
+    // The app automatically pulls GTIN from Variant Barcode field
     return {
       'Google Shopping / Google Product Category': shoppingData.category,
       'Google Shopping / Gender': gender,
@@ -388,7 +560,26 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
           const detectedCollection = detectCollection(product.Title, getOriginalDescription(product));
           const newDescription = await generateThriveraDescription(product, detectedCollection);
           const seoContent = generateSEO(product, detectedCollection);
-          const googleShopping = generateGoogleShopping(product, detectedCollection);
+          
+          // Look for GTIN with enhanced search
+          const gtinResult = await searchForGTIN(product);
+          let gtin = null;
+          let gtinStatus = 'Not found';
+          let searchSuggestions = [];
+          
+          if (typeof gtinResult === 'string') {
+            if (gtinResult === 'LOOKUP_NEEDED') {
+              gtinStatus = 'Manual lookup required';
+            } else {
+              gtin = gtinResult;
+              gtinStatus = 'Found';
+            }
+          } else if (typeof gtinResult === 'object' && gtinResult.status) {
+            gtinStatus = gtinResult.message || 'Manual lookup required';
+            searchSuggestions = gtinResult.searchSuggestions || [];
+          }
+          
+          const googleShopping = generateGoogleShopping(product, detectedCollection, gtin);
           const newTags = collectionTags[detectedCollection].tags.join(', ');
           
           const result = {
@@ -400,6 +591,9 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
             originalTags: product.Tags || '',
             originalSeoTitle: product['SEO Title'] || '',
             originalSeoDescription: product['SEO Description'] || '',
+            foundGTIN: gtin,
+            gtinStatus: gtinStatus,
+            gtinSearchSuggestions: searchSuggestions,
             newDescription,
             newTags,
             newSeoTitle: seoContent.title,
@@ -482,6 +676,17 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
             col.toLowerCase().includes('html')
           );
           console.log('Found description columns:', descColumns);
+          
+          // Check for GTIN/UPC/Barcode columns
+          const gtinColumns = columns.filter(col => 
+            col.toLowerCase().includes('gtin') || 
+            col.toLowerCase().includes('upc') ||
+            col.toLowerCase().includes('ean') ||
+            col.toLowerCase().includes('barcode') ||
+            col.toLowerCase().includes('isbn') ||
+            col.toLowerCase().includes('sku')
+          );
+          console.log('Found GTIN/barcode columns:', gtinColumns);
         }
 
         const titleMap = new Map();
@@ -601,7 +806,13 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
         delete cleanProduct.newTags;
         delete cleanProduct.newSeoTitle;
         delete cleanProduct.newSeoDescription;
+        delete cleanProduct.foundGTIN;
+        delete cleanProduct.gtinStatus;
+        delete cleanProduct.gtinSearchSuggestions;
         delete cleanProduct.id;
+        
+        // Note: Google Shopping settings are configured in Shopify's Google Shopping app
+        // They are not imported via CSV - the app pulls data from standard product fields
         
         if (product.enriched) {
           cleanProduct['Body (HTML)'] = product.newDescription || product.originalDescription;
@@ -609,22 +820,24 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
           cleanProduct['SEO Title'] = product.newSeoTitle || product.originalSeoTitle;
           cleanProduct['SEO Description'] = product.newSeoDescription || product.originalSeoDescription;
           
-          cleanProduct['Google Shopping / Google Product Category'] = product['Google Shopping / Google Product Category'] || '';
-          cleanProduct['Google Shopping / Gender'] = product['Google Shopping / Gender'] || '';
-          cleanProduct['Google Shopping / Age Group'] = product['Google Shopping / Age Group'] || '';
-          cleanProduct['Google Shopping / Condition'] = product['Google Shopping / Condition'] || '';
-          cleanProduct['Google Shopping / Custom Product'] = product['Google Shopping / Custom Product'] || '';
-          cleanProduct['Google Shopping / Custom Label 0'] = product['Google Shopping / Custom Label 0'] || '';
-          cleanProduct['Google Shopping / Custom Label 1'] = product['Google Shopping / Custom Label 1'] || '';
-          cleanProduct['Google Shopping / Custom Label 2'] = product['Google Shopping / Custom Label 2'] || '';
-          cleanProduct['Google Shopping / Custom Label 3'] = product['Google Shopping / Custom Label 3'] || '';
-          cleanProduct['Google Shopping / Custom Label 4'] = product['Google Shopping / Custom Label 4'] || '';
+          // Add GTIN to Shopify's standard barcode field ONLY
+          // Shopify doesn't accept arbitrary Google Shopping columns in product import
+          if (product.foundGTIN && product.foundGTIN !== 'LOOKUP_NEEDED') {
+            cleanProduct['Variant Barcode'] = product.foundGTIN; // Standard Shopify barcode field
+          }
+          
+          // Note: Google Shopping GTIN is handled by Shopify's Google Shopping app automatically
+          // It pulls from the Variant Barcode field, so no separate column needed
         }
         
         if (includeTracking) {
           cleanProduct['Enrichment Status'] = product.enriched ? 'Enriched' : 'Pending';
           cleanProduct['Detected Collection'] = product.detectedCollection || '';
           cleanProduct['Enriched Date'] = product.enrichedAt || '';
+          cleanProduct['GTIN Status'] = product.gtinStatus || '';
+          cleanProduct['Found GTIN'] = product.foundGTIN || '';
+          cleanProduct['GTIN Search Sites'] = product.gtinSearchSuggestions ? 
+            product.gtinSearchSuggestions.map(s => s.site).join(' | ') : '';
         }
         
         return cleanProduct;
@@ -662,7 +875,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
                 🌿 Thrivera Product Enrichment (Debug)
               </h1>
               <p className="text-gray-600">
-                Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.
+                Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, search for GTINs, and optimize for Google Shopping.
               </p>
 
               {csvColumns.length > 0 && (
@@ -671,6 +884,22 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
                   <p className="text-xs text-blue-700">{csvColumns.join(', ')}</p>
                 </div>
               )}
+
+              <div className="bg-yellow-50 p-3 rounded-lg mt-3">
+                <h4 className="text-sm font-medium text-yellow-900 mb-1">🛒 GTIN Lookup via Shopping Sites:</h4>
+                <p className="text-xs text-yellow-700 mb-2">
+                  The tool automatically generates search links for major shopping sites where GTINs are commonly displayed. 
+                  This is often faster and more reliable than APIs!
+                </p>
+                <div className="text-xs text-yellow-800 bg-yellow-100 p-2 rounded">
+                  <strong>Smart Shopping Site Search:</strong>
+                  <br />• <strong>Google Shopping</strong> - Shows GTINs in product details
+                  <br />• <strong>Amazon, Walmart, Target</strong> - UPC visible in specifications  
+                  <br />• <strong>Manufacturer Sites</strong> - Official product pages with codes
+                  <br />• <strong>UPC Databases</strong> - Dedicated barcode lookup sites
+                  <br /><em>💡 Click the provided links to search each site automatically!</em>
+                </div>
+              </div>
 
               <div className="bg-gray-50 p-5 rounded-lg mt-5">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Processing Mode</h3>
@@ -816,6 +1045,21 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
         {products.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">🏷️ Thrivera Collections & Google Shopping</h2>
+            
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <h3 className="font-medium text-green-900 mb-2">🛒 Smart GTIN Discovery</h3>
+              <div className="text-sm text-green-800 space-y-1">
+                <div><strong>Shopping Site Lookup (Recommended):</strong></div>
+                <div>• <strong>Google Shopping</strong> → Direct links to product searches with visible GTINs</div>
+                <div>• <strong>Major Retailers</strong> → Amazon, Walmart, Target show UPCs in details</div>
+                <div>• <strong>Manufacturer Sites</strong> → Official pages often have product codes</div>
+                <div className="text-xs text-green-700 mt-2">
+                  💡 <strong>Why this works:</strong> Most retailers display UPC/GTIN in product specs - no API needed!
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(collectionTags).map(([collection, data]) => (
                 <div key={collection} className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -868,6 +1112,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
                   <button
                     onClick={() => exportEnrichedData(false)}
                     className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2 transition-colors"
+                    title="Exports with found GTINs in 'Variant Barcode' column + search suggestions for missing ones"
                   >
                     <Download className="h-4 w-4" />
                     Export for Shopify
@@ -951,11 +1196,52 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
                              </div>
 
                              <div className="lg:col-span-2">
-                               <h4 className="text-sm font-medium text-blue-700 mb-2">Google Shopping Data</h4>
+                               <h4 className="text-sm font-medium text-blue-700 mb-2">Shopify Data & GTIN</h4>
                                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-blue-800 space-y-1">
-                                 <div><strong>Category:</strong> {product['Google Shopping / Google Product Category']}</div>
-                                 <div><strong>Gender:</strong> {product['Google Shopping / Gender']} | <strong>Condition:</strong> {product['Google Shopping / Condition']}</div>
-                                 <div><strong>Labels:</strong> {product['Google Shopping / Custom Label 0']}, {product['Google Shopping / Custom Label 1']}, {product['Google Shopping / Custom Label 4']}</div>
+                                 <div><strong>Detected Collection:</strong> {product.detectedCollection}</div>
+                                 <div><strong>GTIN/Barcode:</strong> {product.foundGTIN || 'Not found'} 
+                                   {product.gtinStatus && (
+                                     <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                                       product.gtinStatus === 'Found' ? 'bg-green-100 text-green-800' :
+                                       product.gtinStatus.includes('Manual lookup') ? 'bg-yellow-100 text-yellow-800' :
+                                       'bg-gray-100 text-gray-800'
+                                     }`}>
+                                       {product.gtinStatus.includes('Found') ? 'Found' : 
+                                        product.gtinStatus.includes('Manual') ? 'Manual lookup needed' : 
+                                        product.gtinStatus}
+                                     </span>
+                                   )}
+                                 </div>
+                                 {product.gtinSearchSuggestions && product.gtinSearchSuggestions.length > 0 && (
+                                   <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
+                                     <div className="text-yellow-800 font-medium mb-2">🛒 Shopping Site Lookup:</div>
+                                     <div className="space-y-1">
+                                       {product.gtinSearchSuggestions.map((suggestion, idx) => (
+                                         <div key={idx} className="flex items-start gap-2">
+                                           <div className="text-yellow-700 text-xs flex-1">
+                                             <a 
+                                               href={suggestion.url}
+                                               target="_blank"
+                                               rel="noopener noreferrer"
+                                               className="font-medium underline hover:text-yellow-900 block"
+                                             >
+                                               🔗 Search {suggestion.site}
+                                             </a>
+                                             <div className="text-xs text-yellow-600 mt-1 italic">
+                                               {suggestion.tip}
+                                             </div>
+                                           </div>
+                                         </div>
+                                       ))}
+                                       <div className="text-xs text-yellow-600 mt-2 p-2 bg-yellow-100 rounded">
+                                         💡 <strong>How to find GTIN:</strong> Look for "UPC", "GTIN", "EAN", or "Barcode" in product details on these sites
+                                       </div>
+                                     </div>
+                                   </div>
+                                 )}
+                                 <div className="text-xs text-blue-600 mt-2">
+                                   → Goes to <strong>Variant Barcode</strong> in Shopify CSV
+                                 </div>
                                </div>
                              </div>
                            </div>
