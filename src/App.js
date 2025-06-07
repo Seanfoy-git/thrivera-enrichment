@@ -1,5 +1,5 @@
 // Google Shopping Debug Version - Updated 2025-05-29
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Upload, Download, Check, Search, RefreshCw, Wand2, AlertCircle, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
 
@@ -94,7 +94,10 @@ const App = () => {
     toProcess: 0, 
     alreadyEnriched: 0 
   });
-  const [cancelProcessing, setCancelProcessing] = useState(false);
+  const [csvColumns, setCsvColumns] = useState([]);
+  
+  // Use useRef for cancel flag to get immediate updates
+  const cancelRef = useRef(false);
 
   // Collection Detection Function
   const detectCollection = (title, description) => {
@@ -131,7 +134,29 @@ const App = () => {
     return 'Everyday Comforts';
   };
 
-  // OpenAI API function
+  // Function to get original description from various possible columns
+  const getOriginalDescription = (product) => {
+    // Try different possible column names for description
+    const possibleDescColumns = [
+      'Body (HTML)',
+      'Description',
+      'Product Description', 
+      'Body',
+      'HTML Description',
+      'Long Description'
+    ];
+    
+    for (const col of possibleDescColumns) {
+      if (product[col] && typeof product[col] === 'string' && product[col].trim()) {
+        return product[col].replace(/<[^>]*>/g, '').trim();
+      }
+    }
+    
+    // If no description found, return a basic one based on title
+    return `Premium ${product.Title || 'product'} for your wellness journey.`;
+  };
+
+  // OpenAI API function with better variety
   const generateAIDescription = async (product, collection, originalDesc) => {
     const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
     
@@ -143,70 +168,54 @@ const App = () => {
     const productTitle = product.Title || '';
     const productType = product['Product Type'] || '';
     const vendor = product.Vendor || '';
-    const tags = product.Tags || '';
-    const variantTitle = product['Variant Title'] || '';
-    const option1Name = product['Option1 Name'] || '';
-    const option1Value = product['Option1 Value'] || '';
-    const option2Name = product['Option2 Name'] || '';
-    const option2Value = product['Option2 Value'] || '';
-    const option3Name = product['Option3 Name'] || '';
-    const option3Value = product['Option3 Value'] || '';
 
-    // Create different prompt templates for variety
-    const promptTemplates = [
-      {
-        starter: "Discover",
-        focus: "wellness benefits and daily life enhancement",
-        tone: "warm and inviting"
-      },
-      {
-        starter: "Experience",
-        focus: "transformative qualities and mindful living",
-        tone: "inspiring and uplifting"
-      },
-      {
-        starter: "Embrace",
-        focus: "comfort and well-being",
-        tone: "nurturing and supportive"
-      },
-      {
-        starter: "Welcome",
-        focus: "peaceful moments and self-care",
-        tone: "gentle and caring"
-      },
-      {
-        starter: "Find",
-        focus: "balance and harmony in daily routines",
-        tone: "encouraging and empowering"
-      }
+    // Create different prompt approaches for REAL variety
+    const promptVariations = [
+      // Approach 1: Benefits-focused
+      `Write a wellness-focused product description for ${productTitle}. 
+
+Original description: ${originalDesc}
+Collection: ${collection}
+
+Start with a compelling benefit statement (not "Discover" or "Experience"). Focus on how this specific product enhances daily wellness. Keep all product details like size, color, material, scent, etc. Write 2-3 paragraphs ending with "Experience the Thrivera difference." Be conversational and specific.`,
+
+      // Approach 2: Lifestyle-focused  
+      `Transform this product description into Thrivera's wellness voice for ${productTitle}.
+
+Original: ${originalDesc}
+Collection: ${collection}
+
+Begin with how this fits into a wellness lifestyle (avoid "Welcome" or "Embrace"). Highlight specific features and benefits. Maintain all technical details. Write naturally as if recommending to a friend. End with "Experience the Thrivera difference."`,
+
+      // Approach 3: Problem-solution focused
+      `Create a Thrivera description for ${productTitle} that addresses wellness needs.
+
+Original: ${originalDesc}  
+Collection: ${collection}
+
+Start by identifying what wellness challenge this solves (don't use "Find" or generic openings). Explain the solution this product provides. Keep all specifications intact. Write 150-200 words ending with "Experience the Thrivera difference."`,
+
+      // Approach 4: Sensory-focused
+      `Write an engaging product description for ${productTitle} emphasizing the sensory wellness experience.
+
+Original: ${originalDesc}
+Collection: ${collection}
+
+Begin with the sensory experience or feeling this product creates. Describe textures, comfort, or atmosphere. Preserve all product specifications. Make it feel premium and thoughtful. End with "Experience the Thrivera difference."`,
+
+      // Approach 5: Community-focused
+      `Create a Thrivera description for ${productTitle} that feels personal and supportive.
+
+Original: ${originalDesc}
+Collection: ${collection}
+
+Start with an empathetic understanding of the customer's wellness journey. Show how this product supports their goals. Keep all technical details. Write warmly and inclusively. Conclude with "Experience the Thrivera difference."`
     ];
 
-    // Randomly select a template for variety
-    const template = promptTemplates[Math.floor(Math.random() * promptTemplates.length)];
-
-    const prompt = `Transform this product description into Thrivera's wellness-focused voice using a ${template.tone} tone.
-
-PRODUCT DETAILS TO PRESERVE:
-- Title: ${productTitle}
-- Type: ${productType}
-- Vendor: ${vendor}
-- Original Description: ${originalDesc}
-- Product Specifications: ${variantTitle} ${option1Name}: ${option1Value} ${option2Name}: ${option2Value} ${option3Name}: ${option3Value}
-- Collection Context: ${collection}
-
-WRITING REQUIREMENTS:
-- Start with "${template.starter}" (not "Indulge")
-- Focus on ${template.focus}
-- Keep ALL specific product details (size, color, flavor, scent, material, dimensions, etc.)
-- Use ${template.tone} language
-- Mention how it fits into the ${collection} wellness collection
-- Write 2-3 paragraphs, 150-200 words
-- End with "Experience the Thrivera difference."
-- Make it unique and avoid generic wellness language
-
-Write only the product description, no titles or extra text.`;
+    // Randomly select approach
+    const selectedPrompt = promptVariations[Math.floor(Math.random() * promptVariations.length)];
     
-    console.log('Making OpenAI API request for:', product.Title);
+    console.log('AI Prompt approach:', Math.floor(Math.random() * promptVariations.length) + 1, 'for:', product.Title);
 
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -217,9 +226,11 @@ Write only the product description, no titles or extra text.`;
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 200,
-          temperature: 0.8 // Increased for more variety
+          messages: [{ role: 'user', content: selectedPrompt }],
+          max_tokens: 250,
+          temperature: 0.9, // Higher for more creativity
+          presence_penalty: 0.6, // Encourage unique content
+          frequency_penalty: 0.4 // Reduce repetitive phrases
         })
       });
 
@@ -239,7 +250,7 @@ Write only the product description, no titles or extra text.`;
 
   // Generate Thrivera Description
   const generateThriveraDescription = async (product, collection) => {
-    const originalDesc = (product['Body (HTML)'] || '').replace(/<[^>]*>/g, '').trim();
+    const originalDesc = getOriginalDescription(product);
     
     try {
       const aiDescription = await generateAIDescription(product, collection, originalDesc);
@@ -247,7 +258,7 @@ Write only the product description, no titles or extra text.`;
     } catch (error) {
       console.error('OpenAI generation failed, using fallback:', error);
       const productName = product.Title?.toLowerCase() || 'wellness essential';
-      return `Nurture your wellness with this thoughtfully designed ${productName}. Mindfully crafted to support your daily tranquility. Experience the Thrivera difference.`;
+      return `Transform your daily routine with this thoughtfully designed ${productName}. Carefully selected for the ${collection} collection to support your wellness journey. Experience the Thrivera difference.`;
     }
   };
 
@@ -256,7 +267,7 @@ Write only the product description, no titles or extra text.`;
     const productName = product.Title?.trim() || product.Handle || 'Wellness Product';
     const seoTitle = `${productName} - Wellness Collection | Thrivera`;
     
-    const originalDesc = (product['Body (HTML)'] || '').replace(/<[^>]*>/g, '').trim();
+    const originalDesc = getOriginalDescription(product);
     const firstSentence = originalDesc.split('.')[0] || productName;
     
     let seoDescription = '';
@@ -313,19 +324,21 @@ Write only the product description, no titles or extra text.`;
     };
   };
 
-  // Handle cancel processing - FIXED
+  // Handle cancel processing - FIXED with useRef
   const handleCancelProcessing = () => {
-    setCancelProcessing(true);
-    console.log('Cancel processing requested');
+    console.log('CANCEL BUTTON CLICKED - Setting cancel flag');
+    cancelRef.current = true;
+    setUploadError('Cancelling processing...');
   };
 
-  // Process all products automatically
+  // Process all products automatically - FIXED cancel logic
   const processAllProducts = useCallback(async () => {
     if (products.length === 0) return;
     
+    console.log('Starting processing...');
     setProcessing(true);
     setUploadError('');
-    setCancelProcessing(false);
+    cancelRef.current = false; // Reset cancel flag
     
     let productsToProcess = [];
     if (processingMode === 'smart') {
@@ -354,7 +367,8 @@ Write only the product description, no titles or extra text.`;
       const processedProducts = [...products];
       
       for (let i = 0; i < productsToProcess.length; i++) {
-        if (cancelProcessing) {
+        // Check cancel flag at start of each iteration
+        if (cancelRef.current) {
           console.log('Processing cancelled by user at product', i + 1);
           setUploadError('Processing was cancelled by user.');
           break;
@@ -368,12 +382,10 @@ Write only the product description, no titles or extra text.`;
           currentProduct: product.Title || `Product ${i + 1}`
         }));
         
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
         try {
-          console.log(`Processing product ${i + 1}:`, product.Title);
+          console.log(`Processing product ${i + 1}/${productsToProcess.length}:`, product.Title);
           
-          const detectedCollection = detectCollection(product.Title, product['Body (HTML)'] || '');
+          const detectedCollection = detectCollection(product.Title, getOriginalDescription(product));
           const newDescription = await generateThriveraDescription(product, detectedCollection);
           const seoContent = generateSEO(product, detectedCollection);
           const googleShopping = generateGoogleShopping(product, detectedCollection);
@@ -384,7 +396,7 @@ Write only the product description, no titles or extra text.`;
             enriched: true,
             enrichedAt: new Date().toISOString(),
             detectedCollection,
-            originalDescription: product['Body (HTML)'] || '',
+            originalDescription: getOriginalDescription(product),
             originalTags: product.Tags || '',
             originalSeoTitle: product['SEO Title'] || '',
             originalSeoDescription: product['SEO Description'] || '',
@@ -402,12 +414,19 @@ Write only the product description, no titles or extra text.`;
           
           setProducts([...processedProducts]);
           
-          if (i < productsToProcess.length - 1 && !cancelProcessing) {
+          // Check cancel flag before delay
+          if (cancelRef.current) {
+            console.log('Cancel detected, breaking loop');
+            break;
+          }
+          
+          if (i < productsToProcess.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
           
         } catch (error) {
           console.error('Error processing product:', product.Title, error);
+          // Continue with next product even if one fails
         }
       }
       
@@ -419,12 +438,12 @@ Write only the product description, no titles or extra text.`;
       setUploadError('Error processing products: ' + error.message);
     } finally {
       setProcessing(false);
-      setCancelProcessing(false);
+      cancelRef.current = false;
       setProcessingStats({ total: 0, current: 0, currentProduct: '', toProcess: 0, alreadyEnriched: 0 });
     }
-  }, [products, processingMode, cancelProcessing]);
+  }, [products, processingMode]);
 
-  // Handle file upload
+  // Handle file upload with column detection
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -448,6 +467,21 @@ Write only the product description, no titles or extra text.`;
         if (results.data.length === 0) {
           setUploadError('The CSV file appears to be empty.');
           return;
+        }
+
+        // Debug: Log available columns
+        if (results.data[0]) {
+          const columns = Object.keys(results.data[0]);
+          console.log('Available CSV columns:', columns);
+          setCsvColumns(columns);
+          
+          // Check for description columns
+          const descColumns = columns.filter(col => 
+            col.toLowerCase().includes('description') || 
+            col.toLowerCase().includes('body') ||
+            col.toLowerCase().includes('html')
+          );
+          console.log('Found description columns:', descColumns);
         }
 
         const titleMap = new Map();
@@ -625,11 +659,18 @@ Write only the product description, no titles or extra text.`;
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                🌿 Thrivera Product Enrichment
+                🌿 Thrivera Product Enrichment (Debug)
               </h1>
               <p className="text-gray-600">
                 Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, and optimize for Google Shopping.
               </p>
+
+              {csvColumns.length > 0 && (
+                <div className="bg-blue-50 p-3 rounded-lg mt-3">
+                  <h4 className="text-sm font-medium text-blue-900 mb-1">CSV Columns Detected:</h4>
+                  <p className="text-xs text-blue-700">{csvColumns.join(', ')}</p>
+                </div>
+              )}
 
               <div className="bg-gray-50 p-5 rounded-lg mt-5">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Processing Mode</h3>
@@ -762,10 +803,10 @@ Write only the product description, no titles or extra text.`;
                 
                 <button
                   onClick={handleCancelProcessing}
-                  className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 flex items-center gap-2 transition-colors"
-                  disabled={cancelProcessing}
+                  className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 flex items-center gap-2 transition-colors text-lg font-semibold"
+                  style={{ minWidth: '200px' }}
                 >
-                  {cancelProcessing ? 'Cancelling...' : 'Cancel Processing'}
+                  🛑 CANCEL PROCESSING
                 </button>
               </div>
             </div>
@@ -879,7 +920,7 @@ Write only the product description, no titles or extra text.`;
                              <div>
                                <h4 className="text-sm font-medium text-gray-700 mb-2">Original Description</h4>
                                <div className="bg-gray-50 border rounded-md p-3 text-sm text-gray-600 max-h-32 overflow-y-auto">
-                                 {product.originalDescription.replace(/<[^>]*>/g, '') || 'No description'}
+                                 {product.originalDescription || 'No description found'}
                                </div>
                              </div>
                              
@@ -930,7 +971,7 @@ Write only the product description, no titles or extra text.`;
        )}
 
        <div className="mt-8 text-center text-sm text-gray-500">
-         <p>Thrivera Product Enrichment Tool - Built with wellness in mind 🌿</p>
+         <p>Thrivera Product Enrichment Tool - Debug Version 🌿</p>
        </div>
      </div>
    </div>
