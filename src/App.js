@@ -185,6 +185,54 @@ const App = () => {
     return null;
   };
 
+  // Generate helpful search queries for manual GTIN lookup
+  const generateSearchSuggestions = (product) => {
+    const title = product.Title || '';
+    const vendor = product.Vendor || '';
+    const sku = product['Variant SKU'] || product.SKU || '';
+    const productType = product['Product Type'] || '';
+    
+    const suggestions = [];
+    
+    // Clean up product name for better search results
+    const cleanTitle = title.replace(/[^\w\s-]/g, '').trim();
+    const searchQuery = `${vendor} ${cleanTitle}`.trim();
+    
+    // Google Shopping (shows GTINs in product details)
+    suggestions.push({
+      site: 'Google Shopping',
+      query: `${searchQuery}`,
+      url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchQuery)}`,
+      tip: 'Look for "GTIN" or "UPC" in product details'
+    });
+    
+    // Amazon (shows ASIN and sometimes UPC)
+    suggestions.push({
+      site: 'Amazon',
+      query: `${searchQuery}`,
+      url: `https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`,
+      tip: 'Check product details for "UPC" or use ASIN lookup tools'
+    });
+    
+    // Walmart (often shows UPC clearly)
+    suggestions.push({
+      site: 'Walmart',
+      query: `${searchQuery}`,
+      url: `https://www.walmart.com/search?q=${encodeURIComponent(searchQuery)}`,
+      tip: 'UPC usually visible in product specifications'
+    });
+    
+    // Target (good UPC visibility)
+    suggestions.push({
+      site: 'Target',
+      query: `${searchQuery}`,
+      url: `https://www.target.com/s?searchTerm=${encodeURIComponent(searchQuery)}`,
+      tip: 'Look in "Product details" section for UPC'
+    });
+    
+    return suggestions.slice(0, 4); // Return top 4 suggestions
+  };
+
   // Function to search for GTIN using product information
   const searchForGTIN = async (product) => {
     // First check if GTIN already exists in the data
@@ -258,72 +306,6 @@ const App = () => {
       searchSuggestions: searchSuggestions,
       message: `Manual lookup needed - try searching: "${searchSuggestions[0]}"`
     };
-  };
-
-  // Generate helpful search queries for manual GTIN lookup
-  const generateSearchSuggestions = (product) => {
-    const title = product.Title || '';
-    const vendor = product.Vendor || '';
-    const sku = product['Variant SKU'] || product.SKU || '';
-    const productType = product['Product Type'] || '';
-    
-    const suggestions = [];
-    
-    // Clean up product name for better search results
-    const cleanTitle = title.replace(/[^\w\s-]/g, '').trim();
-    const searchQuery = `${vendor} ${cleanTitle}`.trim();
-    
-    // Google Shopping (shows GTINs in product details)
-    suggestions.push({
-      site: 'Google Shopping',
-      query: `${searchQuery}`,
-      url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchQuery)}`,
-      tip: 'Look for "GTIN" or "UPC" in product details'
-    });
-    
-    // Amazon (shows ASIN and sometimes UPC)
-    suggestions.push({
-      site: 'Amazon',
-      query: `${searchQuery}`,
-      url: `https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`,
-      tip: 'Check product details for "UPC" or use ASIN lookup tools'
-    });
-    
-    // Walmart (often shows UPC clearly)
-    suggestions.push({
-      site: 'Walmart',
-      query: `${searchQuery}`,
-      url: `https://www.walmart.com/search?q=${encodeURIComponent(searchQuery)}`,
-      tip: 'UPC usually visible in product specifications'
-    });
-    
-    // Target (good UPC visibility)
-    suggestions.push({
-      site: 'Target',
-      query: `${searchQuery}`,
-      url: `https://www.target.com/s?searchTerm=${encodeURIComponent(searchQuery)}`,
-      tip: 'Look in "Product details" section for UPC'
-    });
-    
-    // Manufacturer website search
-    if (vendor) {
-      suggestions.push({
-        site: `${vendor} Official Site`,
-        query: `${cleanTitle}`,
-        url: `https://www.google.com/search?q=site:${vendor.toLowerCase().replace(/\s/g, '')}.com+${encodeURIComponent(cleanTitle)}`,
-        tip: 'Official product pages often show UPC/model numbers'
-      });
-    }
-    
-    // UPC lookup sites (reverse lookup if you find the UPC)
-    suggestions.push({
-      site: 'UPC Database',
-      query: `${searchQuery} UPC`,
-      url: `https://www.upcitemdb.com/upc/search?q=${encodeURIComponent(searchQuery)}`,
-      tip: 'Dedicated UPC database - paste found UPC to verify'
-    });
-    
-    return suggestions.slice(0, 4); // Return top 4 suggestions
   };
 
   // OpenAI API function with better variety
@@ -1083,7 +1065,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
         )}
 
         {enrichedCount > 0 && (
-          <>
+          <React.Fragment>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
               <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
                 <div className="flex gap-4 items-center">
@@ -1252,403 +1234,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
                )}
              </div>
            </div>
-         </>
-       )}
-
-       <div className="mt-8 text-center text-sm text-gray-500">
-         <p>Thrivera Product Enrichment Tool - Debug Version 🌿</p>
-       </div>
-     </div>
-   </div>
-  );
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                🌿 Thrivera Product Enrichment (Debug)
-              </h1>
-              <p className="text-gray-600">
-                Automatically transform vendor product descriptions into consistent Thrivera wellness voice, assign collection tags, search for GTINs, and optimize for Google Shopping.
-              </p>
-
-              {csvColumns.length > 0 && (
-                <div className="bg-blue-50 p-3 rounded-lg mt-3">
-                  <h4 className="text-sm font-medium text-blue-900 mb-1">CSV Columns Detected:</h4>
-                  <p className="text-xs text-blue-700">{csvColumns.join(', ')}</p>
-                </div>
-              )}
-
-              <div className="bg-yellow-50 p-3 rounded-lg mt-3">
-                <h4 className="text-sm font-medium text-yellow-900 mb-1">🛒 GTIN Lookup via Shopping Sites:</h4>
-                <p className="text-xs text-yellow-700 mb-2">
-                  The tool automatically generates search links for major shopping sites where GTINs are commonly displayed. 
-                  This is often faster and more reliable than APIs!
-                </p>
-                <div className="text-xs text-yellow-800 bg-yellow-100 p-2 rounded">
-                  <strong>Smart Shopping Site Search:</strong>
-                  <br />• <strong>Google Shopping</strong> - Shows GTINs in product details
-                  <br />• <strong>Amazon, Walmart, Target</strong> - UPC visible in specifications  
-                  <br />• <strong>Manufacturer Sites</strong> - Official product pages with codes
-                  <br />• <strong>UPC Databases</strong> - Dedicated barcode lookup sites
-                  <br /><em>💡 Click the provided links to search each site automatically!</em>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-5 rounded-lg mt-5">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Processing Mode</h3>
-                
-                <label className="flex items-center mb-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    value="smart" 
-                    checked={processingMode === 'smart'}
-                    onChange={(e) => setProcessingMode(e.target.value)}
-                    className="mr-3"
-                  />
-                  <div>
-                    <span className="font-medium">Smart Mode</span>
-                    <p className="text-sm text-gray-600">Skip products that already have Thrivera voice or collection tags</p>
-                  </div>
-                </label>
-                
-                <label className="flex items-center cursor-pointer">
-                  <input 
-                    type="radio" 
-                    value="force" 
-                    checked={processingMode === 'force'}
-                    onChange={(e) => setProcessingMode(e.target.value)}
-                    className="mr-3"
-                  />
-                  <div>
-                    <span className="font-medium">Force All</span>
-                    <p className="text-sm text-gray-600">Reprocess everything, even products that are already enriched</p>
-                  </div>
-                </label>
-              </div>
-            </div>
-            {totalCount > 0 && (
-              <button
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to clear all products? This cannot be undone.')) {
-                    setProducts([]);
-                    setFilteredProducts([]);
-                  }
-                }}
-                className="text-red-600 hover:text-red-800 flex items-center gap-2 text-sm"
-                title="Clear all products"
-              >
-                <Trash2 className="h-4 w-4" />
-                Clear All
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Upload & Process</h2>
-            {totalCount > 0 && (
-              <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                {enrichedCount} of {totalCount} products processed ({Math.round((enrichedCount/totalCount) * 100)}%)
-              </div>
-            )}
-          </div>
-          
-          {uploadError && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-              <span className="text-red-800">{uploadError}</span>
-            </div>
-          )}
-          
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition-colors">
-            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <label htmlFor="file-upload" className="cursor-pointer">
-              <span className="mt-2 block text-sm font-medium text-gray-900">
-                Upload your Shopify CSV to begin automatic processing
-              </span>
-              <span className="mt-1 block text-xs text-gray-500">
-                Supports standard Shopify product export format
-              </span>
-              <input
-                id="file-upload"
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
-          </div>
-          
-          {products.length > 0 && !processing && (
-            <div className="mt-6 text-center">
-              <button
-                onClick={processAllProducts}
-                className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 flex items-center gap-2 mx-auto transition-colors"
-              >
-                <Wand2 className="h-5 w-5" />
-                Process Products with Thrivera Voice + Google Shopping
-              </button>
-            </div>
-          )}
-
-          {processing && (
-            <div className="mt-6">
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-full max-w-lg">
-                  <div className="flex justify-between text-sm text-gray-600 mb-2">
-                    <span>Processing Products</span>
-                    <span>{processingStats.current} of {processingStats.total}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-4">
-                    <div 
-                      className="bg-green-600 h-4 rounded-full transition-all duration-500 ease-out" 
-                      style={{ 
-                        width: `${processingStats.total > 0 ? Math.round((processingStats.current / processingStats.total) * 100) : 0}%` 
-                      }}
-                    ></div>
-                  </div>
-                  <div className="text-sm text-gray-600 mt-3 text-center">
-                    {processingStats.currentProduct && (
-                      <span>Currently processing: <strong>{processingStats.currentProduct}</strong></span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2 text-green-600">
-                  <RefreshCw className="h-5 w-5 animate-spin" />
-                  <span>
-                    {processingStats.total > 0 ? Math.round((processingStats.current / processingStats.total) * 100) : 0}% complete 
-                    ({processingStats.current} of {processingStats.total} products)
-                  </span>
-                </div>
-                
-                <button
-                  onClick={handleCancelProcessing}
-                  className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 flex items-center gap-2 transition-colors text-lg font-semibold"
-                  style={{ minWidth: '200px' }}
-                >
-                  🛑 CANCEL PROCESSING
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {products.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏷️ Thrivera Collections & Google Shopping</h2>
-            
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-              <h3 className="font-medium text-green-900 mb-2">🛒 Smart GTIN Discovery</h3>
-              <div className="text-sm text-green-800 space-y-1">
-                <div><strong>Shopping Site Lookup (Recommended):</strong></div>
-                <div>• <strong>Google Shopping</strong> → Direct links to product searches with visible GTINs</div>
-                <div>• <strong>Major Retailers</strong> → Amazon, Walmart, Target show UPCs in details</div>
-                <div>• <strong>Manufacturer Sites</strong> → Official pages often have product codes</div>
-                <div className="text-xs text-green-700 mt-2">
-                  💡 <strong>Why this works:</strong> Most retailers display UPC/GTIN in product specs - no API needed!
-                </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(collectionTags).map(([collection, data]) => (
-                <div key={collection} className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="font-medium text-green-900 mb-2">{collection}</h3>
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {data.tags.map(tag => (
-                      <span key={tag} className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs text-green-700 mb-1">
-                    Auto-detected by: {data.keywords.slice(0, 3).join(', ')}...
-                  </p>
-                  <p className="text-xs text-blue-700">
-                    Google Category: {googleShoppingData[collection]?.category.split(' > ').pop()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {enrichedCount > 0 && (
-          <>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                <div className="flex gap-4 items-center">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <input
-                      type="text"
-                      placeholder="Search products..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="all">All Products</option>
-                    <option value="enriched">Processed</option>
-                    <option value="pending">Pending</option>
-                  </select>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => exportEnrichedData(false)}
-                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2 transition-colors"
-                    title="Exports with found GTINs in 'Variant Barcode' column + search suggestions for missing ones"
-                  >
-                    <Download className="h-4 w-4" />
-                    Export for Shopify
-                  </button>
-                  <button
-                    onClick={() => exportEnrichedData(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
-                  >
-                    <Download className="h-4 w-4" />
-                    Export with Tracking
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Processed Products ({filteredProducts.length})
-                </h2>
-              </div>
-              <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-               {filteredProducts.length === 0 ? (
-                 <div className="p-6 text-center text-gray-500">
-                   {searchTerm || filterStatus !== 'all' ? 'No products match your search criteria.' : 'No processed products to display.'}
-                 </div>
-               ) : (
-                filteredProducts.map((product, index) => (
-                  <div key={`${product.id}-${index}`} className="p-6">
-                     <div className="flex items-start justify-between mb-4">
-                       <div className="flex-1">
-                         <div className="flex items-center gap-3 mb-2">
-                           <h3 className="text-lg font-medium text-gray-900">
-                             {product.Title?.trim() || product.Handle || `Product ${product.id || 'Unknown'}`}
-                           </h3>
-                           {product.enriched && (
-                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                               <Check className="h-3 w-3 mr-1" />
-                               {product.detectedCollection}
-                             </span>
-                           )}
-                         </div>
-                         
-                         {product.Vendor && (
-                           <p className="text-sm text-gray-500 mb-2">Vendor: {product.Vendor}</p>
-                         )}
-                         
-                         {product.enriched && (
-                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-                             <div>
-                               <h4 className="text-sm font-medium text-gray-700 mb-2">Original Description</h4>
-                               <div className="bg-gray-50 border rounded-md p-3 text-sm text-gray-600 max-h-32 overflow-y-auto">
-                                 {product.originalDescription || 'No description found'}
-                               </div>
-                             </div>
-                             
-                             <div>
-                               <h4 className="text-sm font-medium text-green-700 mb-2">Thrivera Description</h4>
-                               <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-800 max-h-32 overflow-y-auto">
-                                 {product.newDescription}
-                               </div>
-                             </div>
-                             
-                             <div>
-                               <h4 className="text-sm font-medium text-gray-700 mb-2">Collection Tags</h4>
-                               <div className="flex flex-wrap gap-1">
-                                 {product.newTags.split(', ').map(tag => (
-                                   <span key={tag} className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                                     {tag}
-                                   </span>
-                                 ))}
-                               </div>
-                             </div>
-                             
-                             <div>
-                               <h4 className="text-sm font-medium text-gray-700 mb-2">SEO Content</h4>
-                               <div className="text-xs text-gray-600 space-y-1">
-                                 <div><strong>Title:</strong> {product.newSeoTitle}</div>
-                                 <div><strong>Description:</strong> {product.newSeoDescription}</div>
-                               </div>
-                             </div>
-
-                             <div className="lg:col-span-2">
-                               <h4 className="text-sm font-medium text-blue-700 mb-2">Shopify Data & GTIN</h4>
-                               <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-blue-800 space-y-1">
-                                 <div><strong>Detected Collection:</strong> {product.detectedCollection}</div>
-                                 <div><strong>GTIN/Barcode:</strong> {product.foundGTIN || 'Not found'} 
-                                   {product.gtinStatus && (
-                                     <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                                       product.gtinStatus === 'Found' ? 'bg-green-100 text-green-800' :
-                                       product.gtinStatus.includes('Manual lookup') ? 'bg-yellow-100 text-yellow-800' :
-                                       'bg-gray-100 text-gray-800'
-                                     }`}>
-                                       {product.gtinStatus.includes('Found') ? 'Found' : 
-                                        product.gtinStatus.includes('Manual') ? 'Manual lookup needed' : 
-                                        product.gtinStatus}
-                                     </span>
-                                   )}
-                                 </div>
-                                 {product.gtinSearchSuggestions && product.gtinSearchSuggestions.length > 0 && (
-                                   <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
-                                     <div className="text-yellow-800 font-medium mb-2">🛒 Shopping Site Lookup:</div>
-                                     <div className="space-y-1">
-                                       {product.gtinSearchSuggestions.map((suggestion, idx) => (
-                                         <div key={idx} className="flex items-start gap-2">
-                                           <div className="text-yellow-700 text-xs flex-1">
-                                             <a 
-                                               href={suggestion.url}
-                                               target="_blank"
-                                               rel="noopener noreferrer"
-                                               className="font-medium underline hover:text-yellow-900 block"
-                                             >
-                                               🔗 Search {suggestion.site}
-                                             </a>
-                                             <div className="text-xs text-yellow-600 mt-1 italic">
-                                               {suggestion.tip}
-                                             </div>
-                                           </div>
-                                         </div>
-                                       ))}
-                                       <div className="text-xs text-yellow-600 mt-2 p-2 bg-yellow-100 rounded">
-                                         💡 <strong>How to find GTIN:</strong> Look for "UPC", "GTIN", "EAN", or "Barcode" in product details on these sites
-                                       </div>
-                                     </div>
-                                   </div>
-                                 )}
-                                 <div className="text-xs text-blue-600 mt-2">
-                                   → Goes to <strong>Variant Barcode</strong> in Shopify CSV
-                                 </div>
-                               </div>
-                             </div>
-                           </div>
-                         )}
-                       </div>
-                     </div>
-                   </div>
-                 ))
-               )}
-             </div>
-           </div>
-         </>
+         </React.Fragment>
        )}
 
        <div className="mt-8 text-center text-sm text-gray-500">
