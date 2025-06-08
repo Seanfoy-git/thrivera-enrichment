@@ -247,25 +247,40 @@ const App = () => {
     const productType = product['Product Type'] || '';
     const sku = product['Variant SKU'] || product.SKU || '';
     
-    console.log(`🔍 Searching for GTIN: ${productTitle} by ${vendor}`);
+    console.log(`🔍 Actively searching for GTIN: ${productTitle} by ${vendor}`);
     
-    // Method 1: Try UPC Database API (if API key available)
+    // Method 1: Try UPC Database API (free tier available)
     try {
-      const upcApiKey = process.env.REACT_APP_UPC_API_KEY;
-      if (upcApiKey) {
-        const searchQuery = `${vendor} ${productTitle}`.trim();
-        const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/search?s=${encodeURIComponent(searchQuery)}`, {
-          headers: {
-            'Accept': 'application/json'
+      const searchQuery = `${vendor} ${productTitle}`.trim();
+      const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/search?s=${encodeURIComponent(searchQuery)}`, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Thrivera-Product-Tool/1.0'
+        }
+      });
+      
+      if (upcResponse.ok) {
+        const upcData = await upcResponse.json();
+        if (upcData.items && upcData.items.length > 0) {
+          // Look for exact or close matches
+          for (const item of upcData.items) {
+            const itemTitle = item.title?.toLowerCase() || '';
+            const itemBrand = item.brand?.toLowerCase() || '';
+            const searchTitle = productTitle.toLowerCase();
+            const searchVendor = vendor.toLowerCase();
+            
+            // Check for good matches
+            if ((itemTitle.includes(searchTitle) || searchTitle.includes(itemTitle)) &&
+                (itemBrand.includes(searchVendor) || searchVendor.includes(itemBrand))) {
+              console.log(`✅ Found GTIN via UPC Database: ${item.upc}`);
+              return item.upc;
+            }
           }
-        });
-        
-        if (upcResponse.ok) {
-          const upcData = await upcResponse.json();
-          if (upcData.items && upcData.items.length > 0) {
-            const foundGTIN = upcData.items[0].upc;
-            console.log(`✅ Found GTIN via UPC Database: ${foundGTIN}`);
-            return foundGTIN;
+          
+          // If no exact match but we have results, take the first one
+          if (upcData.items.length > 0) {
+            console.log(`⚠️ Using best match GTIN: ${upcData.items[0].upc}`);
+            return upcData.items[0].upc;
           }
         }
       }
@@ -278,7 +293,9 @@ const App = () => {
       if (productType.toLowerCase().includes('food') || 
           productType.toLowerCase().includes('supplement') ||
           productTitle.toLowerCase().includes('vitamin') ||
-          productTitle.toLowerCase().includes('protein')) {
+          productTitle.toLowerCase().includes('protein') ||
+          productTitle.toLowerCase().includes('powder') ||
+          productTitle.toLowerCase().includes('capsule')) {
         
         const searchQuery = `${productTitle}`.replace(/[^\w\s]/g, '').trim();
         const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(searchQuery)}&search_simple=1&action=process&json=1`);
@@ -286,10 +303,12 @@ const App = () => {
         if (offResponse.ok) {
           const offData = await offResponse.json();
           if (offData.products && offData.products.length > 0) {
-            const foundGTIN = offData.products[0].code;
-            if (foundGTIN && /^\d{8,14}$/.test(foundGTIN)) {
-              console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
-              return foundGTIN;
+            for (const product of offData.products) {
+              const foundGTIN = product.code;
+              if (foundGTIN && /^\d{8,14}$/.test(foundGTIN)) {
+                console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
+                return foundGTIN;
+              }
             }
           }
         }
@@ -298,14 +317,130 @@ const App = () => {
       console.log('Open Food Facts search failed:', error.message);
     }
 
-    // Method 3: Generate search suggestions for manual lookup
+    // Method 3: Try Barcode Spider (free API)
+    try {
+      const searchQuery = `${vendor} ${productTitle}`.trim();
+      const barcodeResponse = await fetch(`https://api.barcodespider.com/v1/lookup?token=free&upc=${encodeURIComponent(searchQuery)}&format=json`);
+      
+      if (barcodeResponse.ok) {
+        const barcodeData = await barcodeResponse.json();
+        if (barcodeData.item_response && barcodeData.item_response.code) {
+          console.log(`✅ Found GTIN via Barcode Spider: ${barcodeData.item_response.code}`);
+          return barcodeData.item_response.code;
+        }
+      }
+    } catch (error) {
+      console.log('Barcode Spider search failed:', error.message);
+    }
+
+    // Method 4: Try to extract from product model/SKU patterns
+    try {
+      const skuPattern = sku || '';
+      const titleWords = productTitle.split(/\s+/);
+      
+      // Look for numeric patterns that could be GTINs
+      const potentialGTINs = [];
+      
+      // Check SKU for GTIN-like patterns
+      if (/^\d{8,14}$/.test(skuPattern)) {
+        potentialGTINs.push(skuPattern);
+      }
+      
+      // Check product title for numbers
+      titleWords.forEach(word => {
+        if (/^\d{8,14}$/.test(word)) {
+          potentialGTINs.push(word);
+        }
+      });
+      
+      // If we found potential GTINs, validate them
+      for (const gtin of potentialGTINs) {
+        if (validateGTIN(gtin)) {
+          console.log(`✅ Found GTIN in product data: ${gtin}`);
+          return gtin;
+        }
+      }
+    } catch (error) {
+      console.log('Pattern extraction failed:', error.message);
+    }
+
+    // Method 5: Try alternative free APIs
+    try {
+      // Search multiple terms
+      const searchTerms = [
+        `${vendor} ${productTitle}`,
+        productTitle,
+        `${vendor} ${productType}`,
+        sku
+      ].filter(term => term && term.trim());
+
+      for (const term of searchTerms) {
+        try {
+          // Try a different approach with fetch to a proxy service
+          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://www.google.com/search?tbm=shop&q=' + encodeURIComponent(term + ' UPC'))}`;
+          const response = await fetch(proxyUrl);
+          
+          if (response.ok) {
+            const data = await response.json();
+            const htmlContent = data.contents;
+            
+            // Look for GTIN patterns in the HTML
+            const gtinMatches = htmlContent.match(/(?:UPC|GTIN|EAN)[\s:]*(\d{8,14})/gi);
+            if (gtinMatches && gtinMatches.length > 0) {
+              const foundGTIN = gtinMatches[0].match(/\d{8,14}/)[0];
+              if (validateGTIN(foundGTIN)) {
+                console.log(`✅ Found GTIN via Google Shopping scrape: ${foundGTIN}`);
+                return foundGTIN;
+              }
+            }
+          }
+        } catch (proxyError) {
+          console.log('Proxy search failed for term:', term);
+        }
+      }
+    } catch (error) {
+      console.log('Alternative search methods failed:', error.message);
+    }
+
+    // Method 6: Generate search suggestions for manual lookup as fallback
     const searchSuggestions = generateSearchSuggestions(product);
     
     return {
       status: 'LOOKUP_NEEDED',
       searchSuggestions: searchSuggestions,
-      message: `Manual lookup needed - try searching: "${searchSuggestions[0]}"`
+      message: `Auto-search unsuccessful - manual lookup needed`
     };
+  };
+
+  // GTIN validation function
+  const validateGTIN = (gtin) => {
+    if (!gtin || typeof gtin !== 'string') return false;
+    
+    // Must be 8, 12, 13, or 14 digits
+    if (!/^\d{8}$|^\d{12}$|^\d{13}$|^\d{14}$/.test(gtin)) return false;
+    
+    // Basic checksum validation for UPC/EAN
+    const digits = gtin.split('').map(Number);
+    let sum = 0;
+    
+    if (gtin.length === 13) { // EAN-13
+      for (let i = 0; i < 12; i++) {
+        sum += digits[i] * (i % 2 === 0 ? 1 : 3);
+      }
+      const checkDigit = (10 - (sum % 10)) % 10;
+      return checkDigit === digits[12];
+    }
+    
+    if (gtin.length === 12) { // UPC-A
+      for (let i = 0; i < 11; i++) {
+        sum += digits[i] * (i % 2 === 0 ? 3 : 1);
+      }
+      const checkDigit = (10 - (sum % 10)) % 10;
+      return checkDigit === digits[11];
+    }
+    
+    // For 8 and 14 digit codes, just return true for now
+    return true;
   };
 
   // OpenAI API function with better variety
