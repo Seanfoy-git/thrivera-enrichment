@@ -91,6 +91,7 @@ const App = () => {
     total: 0, 
     current: 0,
     currentProduct: '',
+    currentAction: '',
     toProcess: 0, 
     alreadyEnriched: 0 
   });
@@ -234,11 +235,12 @@ const App = () => {
   };
 
   // Function to search for GTIN using product information
-  const searchForGTIN = async (product) => {
+  const searchForGTIN = async (product, updateCallback = null) => {
     // First check if GTIN already exists in the data
     const existingGTIN = getExistingGTIN(product);
     if (existingGTIN) {
       console.log(`✅ Found existing GTIN in CSV: ${existingGTIN}`);
+      if (updateCallback) updateCallback('Found existing GTIN in CSV');
       return existingGTIN;
     }
 
@@ -249,15 +251,18 @@ const App = () => {
     const sku = product['Variant SKU'] || product.SKU || '';
     
     console.log(`🔍 Searching for GTIN: "${productTitle}" by "${vendor}"`);
+    if (updateCallback) updateCallback(`Searching databases for: ${productTitle}`);
     
     // Create smart search terms in order of likely success
     const searchTerms = generateSmartSearchTerms(productTitle, vendor, sku);
     console.log(`📝 Generated search terms:`, searchTerms);
 
     // Method 1: Try UPC Database API with multiple search strategies
+    if (updateCallback) updateCallback('Searching UPC Database...');
     for (const searchTerm of searchTerms) {
       try {
         console.log(`🔍 UPC Database trying: "${searchTerm}"`);
+        if (updateCallback) updateCallback(`UPC Database: "${searchTerm}"`);
         
         const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/search?s=${encodeURIComponent(searchTerm)}`, {
           headers: {
@@ -282,6 +287,7 @@ const App = () => {
             // Take the best match if it has a decent score
             if (scoredResults[0].relevanceScore > 0.3 && scoredResults[0].upc) {
               console.log(`✅ Found GTIN via UPC Database: ${scoredResults[0].upc}`);
+              if (updateCallback) updateCallback(`✅ Found GTIN: ${scoredResults[0].upc}`);
               return scoredResults[0].upc;
             }
           }
@@ -297,9 +303,11 @@ const App = () => {
 
     // Method 2: Try Open Food Facts with multiple terms (for wellness products)
     if (isWellnessProduct(productTitle, productType)) {
+      if (updateCallback) updateCallback('Checking Open Food Facts...');
       for (const searchTerm of searchTerms.slice(0, 3)) { // Try top 3 terms
         try {
           console.log(`🥗 Open Food Facts trying: "${searchTerm}"`);
+          if (updateCallback) updateCallback(`Open Food Facts: "${searchTerm}"`);
           
           const cleanTerm = searchTerm.replace(/[^\w\s]/g, '').trim();
           const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanTerm)}&search_simple=1&action=process&json=1`);
@@ -313,6 +321,7 @@ const App = () => {
                 const foundGTIN = product.code;
                 if (foundGTIN && /^\d{8,14}$/.test(foundGTIN) && validateGTIN(foundGTIN)) {
                   console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
+                  if (updateCallback) updateCallback(`✅ Found GTIN: ${foundGTIN}`);
                   return foundGTIN;
                 }
               }
@@ -328,6 +337,7 @@ const App = () => {
     }
 
     // Method 3: Try to extract from product model/SKU patterns
+    if (updateCallback) updateCallback('Checking product data patterns...');
     try {
       console.log(`🔍 Pattern extraction from: SKU="${sku}", Title="${productTitle}"`);
       
@@ -337,6 +347,7 @@ const App = () => {
       for (const gtin of potentialGTINs) {
         if (validateGTIN(gtin)) {
           console.log(`✅ Found valid GTIN in product data: ${gtin}`);
+          if (updateCallback) updateCallback(`✅ Found GTIN in product data: ${gtin}`);
           return gtin;
         }
       }
@@ -346,6 +357,7 @@ const App = () => {
 
     // If we get here, no GTIN was found automatically
     console.log(`❌ All automated searches failed for: "${productTitle}"`);
+    if (updateCallback) updateCallback('No GTIN found - using MPN+Brand strategy');
     
     // Generate search suggestions for manual lookup as fallback
     const searchSuggestions = generateSearchSuggestions(product);
@@ -721,6 +733,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
       total: productsToProcess.length,
       current: 0,
       currentProduct: '',
+      currentAction: '',
       toProcess: productsToProcess.length,
       alreadyEnriched: products.length - productsToProcess.length
     });
@@ -753,12 +766,34 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
         try {
           console.log(`Processing product ${i + 1}/${productsToProcess.length}:`, product.Title);
           
+          setProcessingStats(prev => ({
+            ...prev,
+            currentAction: 'Detecting collection...'
+          }));
+          
           const detectedCollection = detectCollection(product.Title, getOriginalDescription(product));
+          
+          setProcessingStats(prev => ({
+            ...prev,
+            currentAction: 'Generating AI description...'
+          }));
+          
           const newDescription = await generateThriveraDescription(product, detectedCollection);
           const seoContent = generateSEO(product, detectedCollection);
           
+          setProcessingStats(prev => ({
+            ...prev,
+            currentAction: 'Searching for GTIN...'
+          }));
+          
           // Look for GTIN with enhanced search
-          const gtinResult = await searchForGTIN(product);
+          const gtinResult = await searchForGTIN(product, (action) => {
+            setProcessingStats(prev => ({
+              ...prev,
+              currentAction: action
+            }));
+          });
+          
           let gtin = null;
           let gtinStatus = 'Not found';
           let searchSuggestions = [];
@@ -774,6 +809,11 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
             gtinStatus = gtinResult.message || 'Manual lookup required';
             searchSuggestions = gtinResult.searchSuggestions || [];
           }
+          
+          setProcessingStats(prev => ({
+            ...prev,
+            currentAction: 'Finalizing product data...'
+          }));
           
           const googleShopping = generateGoogleShopping(product, detectedCollection, gtin);
           const newTags = collectionTags[detectedCollection].tags.join(', ');
@@ -829,7 +869,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
     } finally {
       setProcessing(false);
       cancelRef.current = false;
-      setProcessingStats({ total: 0, current: 0, currentProduct: '', toProcess: 0, alreadyEnriched: 0 });
+      setProcessingStats({ total: 0, current: 0, currentProduct: '', currentAction: '', toProcess: 0, alreadyEnriched: 0 });
     }
   }, [products, processingMode]);
 
@@ -1214,7 +1254,12 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
                   </div>
                   <div className="text-sm text-gray-600 mt-3 text-center">
                     {processingStats.currentProduct && (
-                      <span>Currently processing: <strong>{processingStats.currentProduct}</strong></span>
+                      <div>
+                        <div><strong>Processing:</strong> {processingStats.currentProduct}</div>
+                        {processingStats.currentAction && (
+                          <div className="text-xs text-blue-600 mt-1">{processingStats.currentAction}</div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1234,6 +1279,10 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
                 >
                   🛑 CANCEL PROCESSING
                 </button>
+                
+                <div className="text-xs text-gray-500 mt-3 text-center">
+                  💡 <strong>See detailed search output:</strong> Open browser Developer Tools (F12) → Console tab
+                </div>
               </div>
             </div>
           )}
