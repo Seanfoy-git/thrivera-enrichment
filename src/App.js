@@ -238,6 +238,7 @@ const App = () => {
     // First check if GTIN already exists in the data
     const existingGTIN = getExistingGTIN(product);
     if (existingGTIN) {
+      console.log(`✅ Found existing GTIN in CSV: ${existingGTIN}`);
       return existingGTIN;
     }
 
@@ -252,6 +253,8 @@ const App = () => {
     // Method 1: Try UPC Database API (free tier available)
     try {
       const searchQuery = `${vendor} ${productTitle}`.trim();
+      console.log(`Trying UPC Database with query: ${searchQuery}`);
+      
       const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/search?s=${encodeURIComponent(searchQuery)}`, {
         headers: {
           'Accept': 'application/json',
@@ -272,18 +275,19 @@ const App = () => {
             // Check for good matches
             if ((itemTitle.includes(searchTitle) || searchTitle.includes(itemTitle)) &&
                 (itemBrand.includes(searchVendor) || searchVendor.includes(itemBrand))) {
-              console.log(`✅ Found GTIN via UPC Database: ${item.upc}`);
-              return item.upc;
+              console.log(`✅ Found GTIN via UPC Database (exact match): ${item.upc}`);
+              return item.upc; // RETURN IMMEDIATELY
             }
           }
           
           // If no exact match but we have results, take the first one
-          if (upcData.items.length > 0) {
-            console.log(`⚠️ Using best match GTIN: ${upcData.items[0].upc}`);
-            return upcData.items[0].upc;
+          if (upcData.items.length > 0 && upcData.items[0].upc) {
+            console.log(`✅ Found GTIN via UPC Database (best match): ${upcData.items[0].upc}`);
+            return upcData.items[0].upc; // RETURN IMMEDIATELY
           }
         }
       }
+      console.log('UPC Database: No results found');
     } catch (error) {
       console.log('UPC Database search failed:', error.message);
     }
@@ -297,6 +301,7 @@ const App = () => {
           productTitle.toLowerCase().includes('powder') ||
           productTitle.toLowerCase().includes('capsule')) {
         
+        console.log(`Trying Open Food Facts for: ${productTitle}`);
         const searchQuery = `${productTitle}`.replace(/[^\w\s]/g, '').trim();
         const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(searchQuery)}&search_simple=1&action=process&json=1`);
         
@@ -307,34 +312,20 @@ const App = () => {
               const foundGTIN = product.code;
               if (foundGTIN && /^\d{8,14}$/.test(foundGTIN)) {
                 console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
-                return foundGTIN;
+                return foundGTIN; // RETURN IMMEDIATELY
               }
             }
           }
         }
+        console.log('Open Food Facts: No results found');
       }
     } catch (error) {
       console.log('Open Food Facts search failed:', error.message);
     }
 
-    // Method 3: Try Barcode Spider (free API)
+    // Method 3: Try to extract from product model/SKU patterns
     try {
-      const searchQuery = `${vendor} ${productTitle}`.trim();
-      const barcodeResponse = await fetch(`https://api.barcodespider.com/v1/lookup?token=free&upc=${encodeURIComponent(searchQuery)}&format=json`);
-      
-      if (barcodeResponse.ok) {
-        const barcodeData = await barcodeResponse.json();
-        if (barcodeData.item_response && barcodeData.item_response.code) {
-          console.log(`✅ Found GTIN via Barcode Spider: ${barcodeData.item_response.code}`);
-          return barcodeData.item_response.code;
-        }
-      }
-    } catch (error) {
-      console.log('Barcode Spider search failed:', error.message);
-    }
-
-    // Method 4: Try to extract from product model/SKU patterns
-    try {
+      console.log(`Trying pattern extraction from SKU/Title: ${sku} / ${productTitle}`);
       const skuPattern = sku || '';
       const titleWords = productTitle.split(/\s+/);
       
@@ -357,52 +348,18 @@ const App = () => {
       for (const gtin of potentialGTINs) {
         if (validateGTIN(gtin)) {
           console.log(`✅ Found GTIN in product data: ${gtin}`);
-          return gtin;
+          return gtin; // RETURN IMMEDIATELY
         }
       }
+      console.log('Pattern extraction: No valid GTINs found');
     } catch (error) {
       console.log('Pattern extraction failed:', error.message);
     }
 
-    // Method 5: Try alternative free APIs
-    try {
-      // Search multiple terms
-      const searchTerms = [
-        `${vendor} ${productTitle}`,
-        productTitle,
-        `${vendor} ${productType}`,
-        sku
-      ].filter(term => term && term.trim());
-
-      for (const term of searchTerms) {
-        try {
-          // Try a different approach with fetch to a proxy service
-          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://www.google.com/search?tbm=shop&q=' + encodeURIComponent(term + ' UPC'))}`;
-          const response = await fetch(proxyUrl);
-          
-          if (response.ok) {
-            const data = await response.json();
-            const htmlContent = data.contents;
-            
-            // Look for GTIN patterns in the HTML
-            const gtinMatches = htmlContent.match(/(?:UPC|GTIN|EAN)[\s:]*(\d{8,14})/gi);
-            if (gtinMatches && gtinMatches.length > 0) {
-              const foundGTIN = gtinMatches[0].match(/\d{8,14}/)[0];
-              if (validateGTIN(foundGTIN)) {
-                console.log(`✅ Found GTIN via Google Shopping scrape: ${foundGTIN}`);
-                return foundGTIN;
-              }
-            }
-          }
-        } catch (proxyError) {
-          console.log('Proxy search failed for term:', term);
-        }
-      }
-    } catch (error) {
-      console.log('Alternative search methods failed:', error.message);
-    }
-
-    // Method 6: Generate search suggestions for manual lookup as fallback
+    // If we get here, no GTIN was found automatically
+    console.log(`❌ No GTIN found for: ${productTitle} - generating manual search suggestions`);
+    
+    // Generate search suggestions for manual lookup as fallback
     const searchSuggestions = generateSearchSuggestions(product);
     
     return {
