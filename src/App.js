@@ -251,93 +251,10 @@ const App = () => {
     const sku = product['Variant SKU'] || product.SKU || '';
     
     console.log(`🔍 Searching for GTIN: "${productTitle}" by "${vendor}"`);
-    if (updateCallback) updateCallback(`Searching databases for: ${productTitle}`);
+    if (updateCallback) updateCallback(`Analyzing product data for: ${productTitle}`);
     
-    // Create smart search terms in order of likely success
-    const searchTerms = generateSmartSearchTerms(productTitle, vendor, sku);
-    console.log(`📝 Generated search terms:`, searchTerms);
-
-    // Method 1: Try UPC Database API with multiple search strategies
-    if (updateCallback) updateCallback('Searching UPC Database...');
-    for (const searchTerm of searchTerms) {
-      try {
-        console.log(`🔍 UPC Database trying: "${searchTerm}"`);
-        if (updateCallback) updateCallback(`UPC Database: "${searchTerm}"`);
-        
-        const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/search?s=${encodeURIComponent(searchTerm)}`, {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Thrivera-Product-Tool/1.0'
-          }
-        });
-        
-        if (upcResponse.ok) {
-          const upcData = await upcResponse.json();
-          console.log(`📊 UPC Database returned ${upcData.items?.length || 0} results for: "${searchTerm}"`);
-          
-          if (upcData.items && upcData.items.length > 0) {
-            // Score and rank results based on relevance
-            const scoredResults = upcData.items.map(item => ({
-              ...item,
-              relevanceScore: calculateRelevanceScore(item, productTitle, vendor)
-            })).sort((a, b) => b.relevanceScore - a.relevanceScore);
-            
-            console.log(`🎯 Best match: "${scoredResults[0].title}" (score: ${scoredResults[0].relevanceScore})`);
-            
-            // Take the best match if it has a decent score
-            if (scoredResults[0].relevanceScore > 0.3 && scoredResults[0].upc) {
-              console.log(`✅ Found GTIN via UPC Database: ${scoredResults[0].upc}`);
-              if (updateCallback) updateCallback(`✅ Found GTIN: ${scoredResults[0].upc}`);
-              return scoredResults[0].upc;
-            }
-          }
-        }
-        
-        // Small delay between searches to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-      } catch (error) {
-        console.log(`❌ UPC Database failed for "${searchTerm}":`, error.message);
-      }
-    }
-
-    // Method 2: Try Open Food Facts with multiple terms (for wellness products)
-    if (isWellnessProduct(productTitle, productType)) {
-      if (updateCallback) updateCallback('Checking Open Food Facts...');
-      for (const searchTerm of searchTerms.slice(0, 3)) { // Try top 3 terms
-        try {
-          console.log(`🥗 Open Food Facts trying: "${searchTerm}"`);
-          if (updateCallback) updateCallback(`Open Food Facts: "${searchTerm}"`);
-          
-          const cleanTerm = searchTerm.replace(/[^\w\s]/g, '').trim();
-          const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanTerm)}&search_simple=1&action=process&json=1`);
-          
-          if (offResponse.ok) {
-            const offData = await offResponse.json();
-            console.log(`📊 Open Food Facts returned ${offData.products?.length || 0} results`);
-            
-            if (offData.products && offData.products.length > 0) {
-              for (const product of offData.products) {
-                const foundGTIN = product.code;
-                if (foundGTIN && /^\d{8,14}$/.test(foundGTIN) && validateGTIN(foundGTIN)) {
-                  console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
-                  if (updateCallback) updateCallback(`✅ Found GTIN: ${foundGTIN}`);
-                  return foundGTIN;
-                }
-              }
-            }
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
-        } catch (error) {
-          console.log(`❌ Open Food Facts failed for "${searchTerm}":`, error.message);
-        }
-      }
-    }
-
-    // Method 3: Try to extract from product model/SKU patterns
-    if (updateCallback) updateCallback('Checking product data patterns...');
+    // Method 1: Try to extract from product model/SKU patterns FIRST
+    if (updateCallback) updateCallback('Checking product data for GTINs...');
     try {
       console.log(`🔍 Pattern extraction from: SKU="${sku}", Title="${productTitle}"`);
       
@@ -355,8 +272,37 @@ const App = () => {
       console.log('❌ Pattern extraction failed:', error.message);
     }
 
+    // Method 2: Check if this looks like a wellness product for Open Food Facts
+    if (updateCallback) updateCallback('Checking wellness product databases...');
+    if (isWellnessProduct(productTitle, productType)) {
+      try {
+        console.log(`🥗 Trying Open Food Facts for wellness product: "${productTitle}"`);
+        
+        const cleanTitle = productTitle.replace(/[^\w\s]/g, ' ').trim();
+        const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanTitle)}&search_simple=1&action=process&json=1`);
+        
+        if (offResponse.ok) {
+          const offData = await offResponse.json();
+          console.log(`📊 Open Food Facts returned ${offData.products?.length || 0} results`);
+          
+          if (offData.products && offData.products.length > 0) {
+            for (const prod of offData.products.slice(0, 5)) { // Check top 5 results
+              const foundGTIN = prod.code;
+              if (foundGTIN && /^\d{8,14}$/.test(foundGTIN) && validateGTIN(foundGTIN)) {
+                console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
+                if (updateCallback) updateCallback(`✅ Found GTIN: ${foundGTIN}`);
+                return foundGTIN;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.log(`❌ Open Food Facts failed:`, error.message);
+      }
+    }
+
     // If we get here, no GTIN was found automatically
-    console.log(`❌ All automated searches failed for: "${productTitle}"`);
+    console.log(`❌ No GTIN found in product data for: "${productTitle}"`);
     if (updateCallback) updateCallback('No GTIN found - using MPN+Brand strategy');
     
     // Generate search suggestions for manual lookup as fallback
@@ -365,7 +311,7 @@ const App = () => {
     return {
       status: 'LOOKUP_NEEDED',
       searchSuggestions: searchSuggestions,
-      message: `Auto-search unsuccessful - tried ${searchTerms.length} search variations`
+      message: `No GTIN found - using alternative identifiers (MPN + Brand)`
     };
   };
 
