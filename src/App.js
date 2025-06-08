@@ -643,6 +643,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
     const title = (product.Title || '').toLowerCase();
     const price = parseFloat(product['Variant Price']) || 0;
     const vendor = product.Vendor || '';
+    const sku = product['Variant SKU'] || product.SKU || '';
     
     let gender = 'unisex';
     if (title.includes('men') && !title.includes('women')) {
@@ -657,20 +658,38 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
     
     const shoppingData = googleShoppingData[collection] || googleShoppingData["Everyday Comforts"];
     
+    // Determine if this should be marked as custom product (no GTIN required)
+    const isCustomProduct = !gtin && (
+      title.includes('custom') || 
+      title.includes('handmade') || 
+      title.includes('personalized') ||
+      title.includes('vintage') ||
+      vendor.toLowerCase().includes('custom') ||
+      vendor.toLowerCase().includes('handmade')
+    );
+    
     // Note: Google Shopping settings are typically managed through Shopify's Google Shopping app
     // The app automatically pulls GTIN from Variant Barcode field
-    return {
+    const googleShoppingData = {
       'Google Shopping / Google Product Category': shoppingData.category,
       'Google Shopping / Gender': gender,
       'Google Shopping / Age Group': 'adult',
       'Google Shopping / Condition': 'new',
-      'Google Shopping / Custom Product': 'FALSE',
+      'Google Shopping / Custom Product': isCustomProduct ? 'TRUE' : 'FALSE',
       'Google Shopping / Custom Label 0': shoppingData.customLabel0,
       'Google Shopping / Custom Label 1': priceRange,
       'Google Shopping / Custom Label 2': vendor.substring(0, 20),
       'Google Shopping / Custom Label 3': shoppingData.customLabel3,
       'Google Shopping / Custom Label 4': 'thrivera-wellness'
     };
+    
+    // Add MPN as alternative identifier if no GTIN
+    if (!gtin && sku) {
+      googleShoppingData['Google Shopping / MPN'] = sku;
+      googleShoppingData['Google Shopping / Brand'] = vendor || 'Thrivera';
+    }
+    
+    return googleShoppingData;
   };
 
   // Handle cancel processing - FIXED with useRef
@@ -1013,6 +1032,9 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
           cleanProduct['Enriched Date'] = product.enrichedAt || '';
           cleanProduct['GTIN Status'] = product.gtinStatus || '';
           cleanProduct['Found GTIN'] = product.foundGTIN || '';
+          cleanProduct['Google Shopping Strategy'] = product.foundGTIN ? 
+            'GTIN' : 
+            `MPN + Brand (${product['Variant SKU'] || product.SKU || 'SKU'} + ${product.Vendor || 'Thrivera'})`;
           cleanProduct['GTIN Search Sites'] = product.gtinSearchSuggestions ? 
             product.gtinSearchSuggestions.map(s => s.site).join(' | ') : '';
         }
@@ -1063,18 +1085,16 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
               )}
 
               <div className="bg-yellow-50 p-3 rounded-lg mt-3">
-                <h4 className="text-sm font-medium text-yellow-900 mb-1">🛒 GTIN Lookup via Shopping Sites:</h4>
+                <h4 className="text-sm font-medium text-yellow-900 mb-1">🛒 Google Shopping Compliance:</h4>
                 <p className="text-xs text-yellow-700 mb-2">
-                  The tool automatically generates search links for major shopping sites where GTINs are commonly displayed. 
-                  This is often faster and more reliable than APIs!
+                  GTINs are preferred but not always required! The tool automatically uses alternative identifiers when GTINs aren't found.
                 </p>
                 <div className="text-xs text-yellow-800 bg-yellow-100 p-2 rounded">
-                  <strong>Smart Shopping Site Search:</strong>
-                  <br />• <strong>Google Shopping</strong> - Shows GTINs in product details
-                  <br />• <strong>Amazon, Walmart, Target</strong> - UPC visible in specifications  
-                  <br />• <strong>Manufacturer Sites</strong> - Official product pages with codes
-                  <br />• <strong>UPC Databases</strong> - Dedicated barcode lookup sites
-                  <br /><em>💡 Click the provided links to search each site automatically!</em>
+                  <strong>Google Shopping Options:</strong>
+                  <br />• <strong>With GTIN</strong> - Uses UPC/EAN in Variant Barcode (preferred)
+                  <br />• <strong>Without GTIN</strong> - Uses MPN + Brand (SKU + Vendor name)
+                  <br />• <strong>Custom Products</strong> - Marked as custom (exempt from GTIN requirement)
+                  <br /><em>💡 All products can list on Google Shopping with proper identifiers!</em>
                 </div>
               </div>
 
@@ -1224,14 +1244,14 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
             <h2 className="text-xl font-semibold text-gray-900 mb-4">🏷️ Thrivera Collections & Google Shopping</h2>
             
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-              <h3 className="font-medium text-green-900 mb-2">🛒 Smart GTIN Discovery</h3>
+              <h3 className="font-medium text-green-900 mb-2">🛒 Smart GTIN Discovery & Google Shopping</h3>
               <div className="text-sm text-green-800 space-y-1">
-                <div><strong>Shopping Site Lookup (Recommended):</strong></div>
-                <div>• <strong>Google Shopping</strong> → Direct links to product searches with visible GTINs</div>
-                <div>• <strong>Major Retailers</strong> → Amazon, Walmart, Target show UPCs in details</div>
-                <div>• <strong>Manufacturer Sites</strong> → Official pages often have product codes</div>
+                <div><strong>GTIN Search Strategy:</strong></div>
+                <div>• <strong>Multiple Search Terms</strong> → Product title, key words, vendor combinations</div>
+                <div>• <strong>Relevance Scoring</strong> → Only accepts good matches, not random results</div>
+                <div>• <strong>Alternative Identifiers</strong> → Uses MPN + Brand when GTIN not found</div>
                 <div className="text-xs text-green-700 mt-2">
-                  💡 <strong>Why this works:</strong> Most retailers display UPC/GTIN in product specs - no API needed!
+                  💡 <strong>No GTIN? No Problem!</strong> Products without GTINs can still list on Google Shopping using MPN/Brand or custom product exemptions
                 </div>
               </div>
             </div>
@@ -1388,6 +1408,17 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
                                      </span>
                                    )}
                                  </div>
+                                 {!product.foundGTIN && (
+                                   <div className="bg-blue-100 border border-blue-300 rounded p-2 mt-2">
+                                     <div className="text-blue-800 font-medium text-xs mb-1">✅ Google Shopping Alternative:</div>
+                                     <div className="text-blue-700 text-xs space-y-1">
+                                       <div>• <strong>Using MPN + Brand</strong> instead of GTIN</div>
+                                       <div>• <strong>MPN:</strong> {product['Variant SKU'] || product.SKU || 'Product SKU'}</div>
+                                       <div>• <strong>Brand:</strong> {product.Vendor || 'Thrivera'}</div>
+                                       <div className="italic">Products can still list on Google Shopping with these identifiers</div>
+                                     </div>
+                                   </div>
+                                 )}
                                  {product.gtinSearchSuggestions && product.gtinSearchSuggestions.length > 0 && (
                                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
                                      <div className="text-yellow-800 font-medium mb-2">🛒 Shopping Site Lookup:</div>
