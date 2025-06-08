@@ -242,122 +242,110 @@ const App = () => {
       return existingGTIN;
     }
 
-    // Try to search for GTIN using product details
+    // Prepare multiple search strategies
     const productTitle = product.Title || '';
     const vendor = product.Vendor || '';
     const productType = product['Product Type'] || '';
     const sku = product['Variant SKU'] || product.SKU || '';
     
-    console.log(`🔍 Actively searching for GTIN: ${productTitle} by ${vendor}`);
+    console.log(`🔍 Searching for GTIN: "${productTitle}" by "${vendor}"`);
     
-    // Method 1: Try UPC Database API (free tier available)
-    try {
-      const searchQuery = `${vendor} ${productTitle}`.trim();
-      console.log(`Trying UPC Database with query: ${searchQuery}`);
-      
-      const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/search?s=${encodeURIComponent(searchQuery)}`, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Thrivera-Product-Tool/1.0'
-        }
-      });
-      
-      if (upcResponse.ok) {
-        const upcData = await upcResponse.json();
-        if (upcData.items && upcData.items.length > 0) {
-          // Look for exact or close matches
-          for (const item of upcData.items) {
-            const itemTitle = item.title?.toLowerCase() || '';
-            const itemBrand = item.brand?.toLowerCase() || '';
-            const searchTitle = productTitle.toLowerCase();
-            const searchVendor = vendor.toLowerCase();
+    // Create smart search terms in order of likely success
+    const searchTerms = generateSmartSearchTerms(productTitle, vendor, sku);
+    console.log(`📝 Generated search terms:`, searchTerms);
+
+    // Method 1: Try UPC Database API with multiple search strategies
+    for (const searchTerm of searchTerms) {
+      try {
+        console.log(`🔍 UPC Database trying: "${searchTerm}"`);
+        
+        const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/search?s=${encodeURIComponent(searchTerm)}`, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Thrivera-Product-Tool/1.0'
+          }
+        });
+        
+        if (upcResponse.ok) {
+          const upcData = await upcResponse.json();
+          console.log(`📊 UPC Database returned ${upcData.items?.length || 0} results for: "${searchTerm}"`);
+          
+          if (upcData.items && upcData.items.length > 0) {
+            // Score and rank results based on relevance
+            const scoredResults = upcData.items.map(item => ({
+              ...item,
+              relevanceScore: calculateRelevanceScore(item, productTitle, vendor)
+            })).sort((a, b) => b.relevanceScore - a.relevanceScore);
             
-            // Check for good matches
-            if ((itemTitle.includes(searchTitle) || searchTitle.includes(itemTitle)) &&
-                (itemBrand.includes(searchVendor) || searchVendor.includes(itemBrand))) {
-              console.log(`✅ Found GTIN via UPC Database (exact match): ${item.upc}`);
-              return item.upc; // RETURN IMMEDIATELY
+            console.log(`🎯 Best match: "${scoredResults[0].title}" (score: ${scoredResults[0].relevanceScore})`);
+            
+            // Take the best match if it has a decent score
+            if (scoredResults[0].relevanceScore > 0.3 && scoredResults[0].upc) {
+              console.log(`✅ Found GTIN via UPC Database: ${scoredResults[0].upc}`);
+              return scoredResults[0].upc;
             }
           }
-          
-          // If no exact match but we have results, take the first one
-          if (upcData.items.length > 0 && upcData.items[0].upc) {
-            console.log(`✅ Found GTIN via UPC Database (best match): ${upcData.items[0].upc}`);
-            return upcData.items[0].upc; // RETURN IMMEDIATELY
-          }
         }
+        
+        // Small delay between searches to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+      } catch (error) {
+        console.log(`❌ UPC Database failed for "${searchTerm}":`, error.message);
       }
-      console.log('UPC Database: No results found');
-    } catch (error) {
-      console.log('UPC Database search failed:', error.message);
     }
 
-    // Method 2: Try Open Food Facts (for food/supplement products)
-    try {
-      if (productType.toLowerCase().includes('food') || 
-          productType.toLowerCase().includes('supplement') ||
-          productTitle.toLowerCase().includes('vitamin') ||
-          productTitle.toLowerCase().includes('protein') ||
-          productTitle.toLowerCase().includes('powder') ||
-          productTitle.toLowerCase().includes('capsule')) {
-        
-        console.log(`Trying Open Food Facts for: ${productTitle}`);
-        const searchQuery = `${productTitle}`.replace(/[^\w\s]/g, '').trim();
-        const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(searchQuery)}&search_simple=1&action=process&json=1`);
-        
-        if (offResponse.ok) {
-          const offData = await offResponse.json();
-          if (offData.products && offData.products.length > 0) {
-            for (const product of offData.products) {
-              const foundGTIN = product.code;
-              if (foundGTIN && /^\d{8,14}$/.test(foundGTIN)) {
-                console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
-                return foundGTIN; // RETURN IMMEDIATELY
+    // Method 2: Try Open Food Facts with multiple terms (for wellness products)
+    if (isWellnessProduct(productTitle, productType)) {
+      for (const searchTerm of searchTerms.slice(0, 3)) { // Try top 3 terms
+        try {
+          console.log(`🥗 Open Food Facts trying: "${searchTerm}"`);
+          
+          const cleanTerm = searchTerm.replace(/[^\w\s]/g, '').trim();
+          const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanTerm)}&search_simple=1&action=process&json=1`);
+          
+          if (offResponse.ok) {
+            const offData = await offResponse.json();
+            console.log(`📊 Open Food Facts returned ${offData.products?.length || 0} results`);
+            
+            if (offData.products && offData.products.length > 0) {
+              for (const product of offData.products) {
+                const foundGTIN = product.code;
+                if (foundGTIN && /^\d{8,14}$/.test(foundGTIN) && validateGTIN(foundGTIN)) {
+                  console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
+                  return foundGTIN;
+                }
               }
             }
           }
+          
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+        } catch (error) {
+          console.log(`❌ Open Food Facts failed for "${searchTerm}":`, error.message);
         }
-        console.log('Open Food Facts: No results found');
       }
-    } catch (error) {
-      console.log('Open Food Facts search failed:', error.message);
     }
 
     // Method 3: Try to extract from product model/SKU patterns
     try {
-      console.log(`Trying pattern extraction from SKU/Title: ${sku} / ${productTitle}`);
-      const skuPattern = sku || '';
-      const titleWords = productTitle.split(/\s+/);
+      console.log(`🔍 Pattern extraction from: SKU="${sku}", Title="${productTitle}"`);
       
-      // Look for numeric patterns that could be GTINs
-      const potentialGTINs = [];
+      const potentialGTINs = extractPotentialGTINs(productTitle, sku);
+      console.log(`📋 Found potential GTINs:`, potentialGTINs);
       
-      // Check SKU for GTIN-like patterns
-      if (/^\d{8,14}$/.test(skuPattern)) {
-        potentialGTINs.push(skuPattern);
-      }
-      
-      // Check product title for numbers
-      titleWords.forEach(word => {
-        if (/^\d{8,14}$/.test(word)) {
-          potentialGTINs.push(word);
-        }
-      });
-      
-      // If we found potential GTINs, validate them
       for (const gtin of potentialGTINs) {
         if (validateGTIN(gtin)) {
-          console.log(`✅ Found GTIN in product data: ${gtin}`);
-          return gtin; // RETURN IMMEDIATELY
+          console.log(`✅ Found valid GTIN in product data: ${gtin}`);
+          return gtin;
         }
       }
-      console.log('Pattern extraction: No valid GTINs found');
     } catch (error) {
-      console.log('Pattern extraction failed:', error.message);
+      console.log('❌ Pattern extraction failed:', error.message);
     }
 
     // If we get here, no GTIN was found automatically
-    console.log(`❌ No GTIN found for: ${productTitle} - generating manual search suggestions`);
+    console.log(`❌ All automated searches failed for: "${productTitle}"`);
     
     // Generate search suggestions for manual lookup as fallback
     const searchSuggestions = generateSearchSuggestions(product);
@@ -365,8 +353,123 @@ const App = () => {
     return {
       status: 'LOOKUP_NEEDED',
       searchSuggestions: searchSuggestions,
-      message: `Auto-search unsuccessful - manual lookup needed`
+      message: `Auto-search unsuccessful - tried ${searchTerms.length} search variations`
     };
+  };
+
+  // Generate smart search terms prioritized by likelihood of success
+  const generateSmartSearchTerms = (title, vendor, sku) => {
+    const terms = [];
+    
+    // Clean up title - remove common noise words and special chars
+    const cleanTitle = title
+      .replace(/\b(the|and|or|with|for|in|on|at|by|from)\b/gi, ' ')
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    const titleWords = cleanTitle.split(' ').filter(word => word.length > 2);
+    
+    // Strategy 1: Product title alone (often most effective)
+    terms.push(cleanTitle);
+    
+    // Strategy 2: Key product words (remove size, color descriptors)
+    const keyWords = titleWords.filter(word => 
+      !word.match(/^\d+(\.\d+)?(oz|ml|mg|lb|kg|inch|in|cm|mm)$/i) &&
+      !word.match(/^(small|medium|large|xl|xxl|black|white|blue|red|green)$/i)
+    );
+    if (keyWords.length > 0) {
+      terms.push(keyWords.join(' '));
+    }
+    
+    // Strategy 3: Vendor + simplified title
+    if (vendor && keyWords.length > 0) {
+      terms.push(`${vendor} ${keyWords.slice(0, 3).join(' ')}`);
+    }
+    
+    // Strategy 4: Main product words only (2-3 key terms)
+    if (titleWords.length >= 2) {
+      terms.push(titleWords.slice(0, 3).join(' '));
+    }
+    
+    // Strategy 5: SKU if it looks like a searchable product code
+    if (sku && sku.length >= 3 && !sku.match(/^\d{8,14}$/)) {
+      terms.push(sku);
+    }
+    
+    // Strategy 6: Individual significant words
+    titleWords.forEach(word => {
+      if (word.length > 4 && !terms.some(term => term.includes(word))) {
+        terms.push(word);
+      }
+    });
+    
+    // Remove duplicates and empty terms
+    return [...new Set(terms)].filter(term => term && term.trim().length > 2);
+  };
+
+  // Calculate relevance score for search results
+  const calculateRelevanceScore = (item, originalTitle, originalVendor) => {
+    let score = 0;
+    
+    const itemTitle = (item.title || '').toLowerCase();
+    const itemBrand = (item.brand || '').toLowerCase();
+    const searchTitle = originalTitle.toLowerCase();
+    const searchVendor = originalVendor.toLowerCase();
+    
+    // Title matching (most important)
+    const titleWords = searchTitle.split(' ').filter(w => w.length > 2);
+    const matchedWords = titleWords.filter(word => itemTitle.includes(word));
+    score += (matchedWords.length / titleWords.length) * 0.6;
+    
+    // Brand matching
+    if (itemBrand && searchVendor) {
+      if (itemBrand.includes(searchVendor) || searchVendor.includes(itemBrand)) {
+        score += 0.3;
+      }
+    }
+    
+    // Exact phrase matching
+    if (itemTitle.includes(searchTitle) || searchTitle.includes(itemTitle)) {
+      score += 0.1;
+    }
+    
+    return score;
+  };
+
+  // Check if product is wellness/supplement related
+  const isWellnessProduct = (title, type) => {
+    const wellnessKeywords = [
+      'vitamin', 'supplement', 'protein', 'powder', 'capsule', 'tablet',
+      'omega', 'probiotics', 'collagen', 'magnesium', 'calcium', 'zinc',
+      'herb', 'extract', 'organic', 'natural', 'wellness', 'health'
+    ];
+    
+    const text = `${title} ${type}`.toLowerCase();
+    return wellnessKeywords.some(keyword => text.includes(keyword));
+  };
+
+  // Extract potential GTINs from product data
+  const extractPotentialGTINs = (title, sku) => {
+    const potentials = [];
+    
+    // Check SKU for GTIN-like patterns
+    if (sku && /^\d{8,14}$/.test(sku)) {
+      potentials.push(sku);
+    }
+    
+    // Check title for numeric codes
+    const numbers = title.match(/\b\d{8,14}\b/g) || [];
+    potentials.push(...numbers);
+    
+    // Check for UPC patterns in title (UPC: followed by numbers)
+    const upcMatches = title.match(/UPC:?\s*(\d{8,14})/gi) || [];
+    upcMatches.forEach(match => {
+      const number = match.match(/\d{8,14}/)[0];
+      potentials.push(number);
+    });
+    
+    return [...new Set(potentials)];
   };
 
   // GTIN validation function
