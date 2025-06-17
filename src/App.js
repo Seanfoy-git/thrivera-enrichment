@@ -689,11 +689,32 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
           cleanProduct['Enriched Date'] = product.enrichedAt || '';
         }
 
-        // --- Shopify Option Name smart inference logic ---
-        // If OptionX Value is set and OptionX Name is blank or null, infer OptionX Name based on the value
-        if (cleanProduct["Option1 Value"] && !cleanProduct["Option1 Name"]) cleanProduct["Option1 Name"] = inferOptionName(cleanProduct["Option1 Value"]);
-        if (cleanProduct["Option2 Value"] && !cleanProduct["Option2 Name"]) cleanProduct["Option2 Name"] = inferOptionName(cleanProduct["Option2 Value"]);
-        if (cleanProduct["Option3 Value"] && !cleanProduct["Option3 Name"]) cleanProduct["Option3 Name"] = inferOptionName(cleanProduct["Option3 Value"]);
+        // --- Ensure valid Shopify status and infer Option Names before export ---
+        // Ensure valid Shopify status
+        if (!cleanProduct["Status"] || cleanProduct["Status"].toString().trim() === "") {
+          cleanProduct["Status"] = "active";
+        }
+
+        // Infer missing option names based on their values
+        function inferOptionName(value) {
+          if (!value) return "";
+          const val = value.toString().toLowerCase();
+          if (val.includes("oz") || val.includes("ml") || val.includes("g")) return "Size";
+          if (val.includes("bar") || val.includes("pack") || val.includes("loaf") || val.includes("bundle")) return "Quantity";
+          if (val.includes("lavender") || val.includes("mint") || val.includes("citrus") || val.includes("vanilla")) return "Scent";
+          if (val.includes("classic") || val.includes("eco") || val.includes("premium") || val.includes("standard")) return "Style";
+          return "Variant";
+        }
+
+        if (cleanProduct["Option1 Value"] && (!cleanProduct["Option1 Name"] || cleanProduct["Option1 Name"].toString().trim() === "")) {
+          cleanProduct["Option1 Name"] = inferOptionName(cleanProduct["Option1 Value"]);
+        }
+        if (cleanProduct["Option2 Value"] && (!cleanProduct["Option2 Name"] || cleanProduct["Option2 Name"].toString().trim() === "")) {
+          cleanProduct["Option2 Name"] = inferOptionName(cleanProduct["Option2 Value"]);
+        }
+        if (cleanProduct["Option3 Value"] && (!cleanProduct["Option3 Name"] || cleanProduct["Option3 Name"].toString().trim() === "")) {
+          cleanProduct["Option3 Name"] = inferOptionName(cleanProduct["Option3 Value"]);
+        }
 
         return cleanProduct;
       });
