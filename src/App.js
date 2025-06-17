@@ -646,18 +646,16 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
       // Prepare export data and apply Shopify Option Name autofill logic (with smart inference)
       function inferOptionName(value) {
         if (!value) return "";
-
         const val = value.toString().toLowerCase();
-
         if (val.includes("oz") || val.includes("ml") || val.includes("g")) return "Size";
         if (val.includes("bar") || val.includes("pack") || val.includes("loaf") || val.includes("bundle")) return "Quantity";
         if (val.includes("lavender") || val.includes("mint") || val.includes("citrus") || val.includes("vanilla")) return "Scent";
         if (val.includes("classic") || val.includes("eco") || val.includes("premium") || val.includes("standard")) return "Style";
-        
         return "Variant"; // fallback
       }
 
-      const enrichedData = products.map(product => {
+      // Build the export rows as before
+      const rowsToExport = products.map(product => {
         const cleanProduct = { ...product };
 
         delete cleanProduct.enriched;
@@ -690,22 +688,12 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
         }
 
         // --- Ensure valid Shopify status and infer Option Names before export ---
-        // Ensure valid Shopify status
+        // Default missing Status to "active"
         if (!cleanProduct["Status"] || cleanProduct["Status"].toString().trim() === "") {
           cleanProduct["Status"] = "active";
         }
 
-        // Infer missing option names based on their values
-        function inferOptionName(value) {
-          if (!value) return "";
-          const val = value.toString().toLowerCase();
-          if (val.includes("oz") || val.includes("ml") || val.includes("g")) return "Size";
-          if (val.includes("bar") || val.includes("pack") || val.includes("loaf") || val.includes("bundle")) return "Quantity";
-          if (val.includes("lavender") || val.includes("mint") || val.includes("citrus") || val.includes("vanilla")) return "Scent";
-          if (val.includes("classic") || val.includes("eco") || val.includes("premium") || val.includes("standard")) return "Style";
-          return "Variant";
-        }
-
+        // Infer Option Names if missing
         if (cleanProduct["Option1 Value"] && (!cleanProduct["Option1 Name"] || cleanProduct["Option1 Name"].toString().trim() === "")) {
           cleanProduct["Option1 Name"] = inferOptionName(cleanProduct["Option1 Value"]);
         }
@@ -719,7 +707,10 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
         return cleanProduct;
       });
 
-      const csv = Papa.unparse(enrichedData, {
+      // Limit export rows to first 5 for Shopify test uploads
+      const limitedRowsToExport = rowsToExport.slice(0, 5);
+
+      const csv = Papa.unparse(limitedRowsToExport, {
         header: true,
         skipEmptyLines: true,
         quotes: false
