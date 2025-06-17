@@ -643,6 +643,20 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
     }
 
     try {
+      // Prepare export data and apply Shopify Option Name autofill logic (with smart inference)
+      function inferOptionName(value) {
+        if (!value) return "";
+
+        const val = value.toString().toLowerCase();
+
+        if (val.includes("oz") || val.includes("ml") || val.includes("g")) return "Size";
+        if (val.includes("bar") || val.includes("pack") || val.includes("loaf") || val.includes("bundle")) return "Quantity";
+        if (val.includes("lavender") || val.includes("mint") || val.includes("citrus") || val.includes("vanilla")) return "Scent";
+        if (val.includes("classic") || val.includes("eco") || val.includes("premium") || val.includes("standard")) return "Style";
+        
+        return "Variant"; // fallback
+      }
+
       const enrichedData = products.map(product => {
         const cleanProduct = { ...product };
 
@@ -674,6 +688,12 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
           cleanProduct['Detected Collection'] = product.detectedCollection || '';
           cleanProduct['Enriched Date'] = product.enrichedAt || '';
         }
+
+        // --- Shopify Option Name smart inference logic ---
+        // If OptionX Value is set and OptionX Name is blank or null, infer OptionX Name based on the value
+        if (cleanProduct["Option1 Value"] && !cleanProduct["Option1 Name"]) cleanProduct["Option1 Name"] = inferOptionName(cleanProduct["Option1 Value"]);
+        if (cleanProduct["Option2 Value"] && !cleanProduct["Option2 Name"]) cleanProduct["Option2 Name"] = inferOptionName(cleanProduct["Option2 Value"]);
+        if (cleanProduct["Option3 Value"] && !cleanProduct["Option3 Name"]) cleanProduct["Option3 Name"] = inferOptionName(cleanProduct["Option3 Value"]);
 
         return cleanProduct;
       });
