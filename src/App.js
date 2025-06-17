@@ -157,314 +157,10 @@ const App = () => {
     return `Premium ${product.Title || 'product'} for your wellness journey.`;
   };
 
-  // Function to detect existing GTIN from CSV columns
-  const getExistingGTIN = (product) => {
-    // Try different possible column names for GTIN/UPC/EAN/ISBN
-    const possibleGTINColumns = [
-      'GTIN',
-      'UPC',
-      'EAN',
-      'ISBN',
-      'Barcode',
-      'Product Code',
-      'SKU',
-      'Variant Barcode',
-      'Variant SKU',
-      'Global Trade Item Number'
-    ];
-    
-    for (const col of possibleGTINColumns) {
-      if (product[col] && product[col].toString().trim()) {
-        const gtin = product[col].toString().trim();
-        // Basic validation - GTINs should be 8, 12, 13, or 14 digits
-        if (/^\d{8}$|^\d{12}$|^\d{13}$|^\d{14}$/.test(gtin)) {
-          return gtin;
-        }
-      }
-    }
-    
-    return null;
-  };
 
-  // Generate helpful search queries for manual GTIN lookup
-  const generateSearchSuggestions = (product) => {
-    const title = product.Title || '';
-    const vendor = product.Vendor || '';
-    const sku = product['Variant SKU'] || product.SKU || '';
-    const productType = product['Product Type'] || '';
-    
-    const suggestions = [];
-    
-    // Clean up product name for better search results
-    const cleanTitle = title.replace(/[^\w\s-]/g, '').trim();
-    const searchQuery = `${vendor} ${cleanTitle}`.trim();
-    
-    // Google Shopping (shows GTINs in product details)
-    suggestions.push({
-      site: 'Google Shopping',
-      query: `${searchQuery}`,
-      url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchQuery)}`,
-      tip: 'Look for "GTIN" or "UPC" in product details'
-    });
-    
-    // Amazon (shows ASIN and sometimes UPC)
-    suggestions.push({
-      site: 'Amazon',
-      query: `${searchQuery}`,
-      url: `https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`,
-      tip: 'Check product details for "UPC" or use ASIN lookup tools'
-    });
-    
-    // Walmart (often shows UPC clearly)
-    suggestions.push({
-      site: 'Walmart',
-      query: `${searchQuery}`,
-      url: `https://www.walmart.com/search?q=${encodeURIComponent(searchQuery)}`,
-      tip: 'UPC usually visible in product specifications'
-    });
-    
-    // Target (good UPC visibility)
-    suggestions.push({
-      site: 'Target',
-      query: `${searchQuery}`,
-      url: `https://www.target.com/s?searchTerm=${encodeURIComponent(searchQuery)}`,
-      tip: 'Look in "Product details" section for UPC'
-    });
-    
-    return suggestions.slice(0, 4); // Return top 4 suggestions
-  };
-
-  // Function to search for GTIN using product information
-  const searchForGTIN = async (product, updateCallback = null) => {
-    // First check if GTIN already exists in the data
-    const existingGTIN = getExistingGTIN(product);
-    if (existingGTIN) {
-      console.log(`✅ Found existing GTIN in CSV: ${existingGTIN}`);
-      if (updateCallback) updateCallback('Found existing GTIN in CSV');
-      return existingGTIN;
-    }
-
-    // Prepare multiple search strategies
-    const productTitle = product.Title || '';
-    const vendor = product.Vendor || '';
-    const productType = product['Product Type'] || '';
-    const sku = product['Variant SKU'] || product.SKU || '';
-    
-    console.log(`🔍 Searching for GTIN: "${productTitle}" by "${vendor}"`);
-    if (updateCallback) updateCallback(`Analyzing product data for: ${productTitle}`);
-    
-    // Method 1: Try to extract from product model/SKU patterns FIRST
-    if (updateCallback) updateCallback('Checking product data for GTINs...');
-    try {
-      console.log(`🔍 Pattern extraction from: SKU="${sku}", Title="${productTitle}"`);
-      
-      const potentialGTINs = extractPotentialGTINs(productTitle, sku);
-      console.log(`📋 Found potential GTINs:`, potentialGTINs);
-      
-      for (const gtin of potentialGTINs) {
-        if (validateGTIN(gtin)) {
-          console.log(`✅ Found valid GTIN in product data: ${gtin}`);
-          if (updateCallback) updateCallback(`✅ Found GTIN in product data: ${gtin}`);
-          return gtin;
-        }
-      }
-    } catch (error) {
-      console.log('❌ Pattern extraction failed:', error.message);
-    }
-
-    // Method 2: Check if this looks like a wellness product for Open Food Facts
-    if (updateCallback) updateCallback('Checking wellness product databases...');
-    if (isWellnessProduct(productTitle, productType)) {
-      try {
-        console.log(`🥗 Trying Open Food Facts for wellness product: "${productTitle}"`);
-        
-        const cleanTitle = productTitle.replace(/[^\w\s]/g, ' ').trim();
-        const offResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanTitle)}&search_simple=1&action=process&json=1`);
-        
-        if (offResponse.ok) {
-          const offData = await offResponse.json();
-          console.log(`📊 Open Food Facts returned ${offData.products?.length || 0} results`);
-          
-          if (offData.products && offData.products.length > 0) {
-            for (const prod of offData.products.slice(0, 5)) { // Check top 5 results
-              const foundGTIN = prod.code;
-              if (foundGTIN && /^\d{8,14}$/.test(foundGTIN) && validateGTIN(foundGTIN)) {
-                console.log(`✅ Found GTIN via Open Food Facts: ${foundGTIN}`);
-                if (updateCallback) updateCallback(`✅ Found GTIN: ${foundGTIN}`);
-                return foundGTIN;
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.log(`❌ Open Food Facts failed:`, error.message);
-      }
-    }
-
-    // If we get here, no GTIN was found automatically
-    console.log(`❌ No GTIN found in product data for: "${productTitle}"`);
-    if (updateCallback) updateCallback('No GTIN found - using MPN+Brand strategy');
-    
-    // Generate search suggestions for manual lookup as fallback
-    const searchSuggestions = generateSearchSuggestions(product);
-    
-    return {
-      status: 'LOOKUP_NEEDED',
-      searchSuggestions: searchSuggestions,
-      message: `No GTIN found - using alternative identifiers (MPN + Brand)`
-    };
-  };
-
-  // Generate smart search terms prioritized by likelihood of success
-  const generateSmartSearchTerms = (title, vendor, sku) => {
-    const terms = [];
-    
-    // Clean up title - remove common noise words and special chars
-    const cleanTitle = title
-      .replace(/\b(the|and|or|with|for|in|on|at|by|from)\b/gi, ' ')
-      .replace(/[^\w\s-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    const titleWords = cleanTitle.split(' ').filter(word => word.length > 2);
-    
-    // Strategy 1: Product title alone (often most effective)
-    terms.push(cleanTitle);
-    
-    // Strategy 2: Key product words (remove size, color descriptors)
-    const keyWords = titleWords.filter(word => 
-      !word.match(/^\d+(\.\d+)?(oz|ml|mg|lb|kg|inch|in|cm|mm)$/i) &&
-      !word.match(/^(small|medium|large|xl|xxl|black|white|blue|red|green)$/i)
-    );
-    if (keyWords.length > 0) {
-      terms.push(keyWords.join(' '));
-    }
-    
-    // Strategy 3: Vendor + simplified title
-    if (vendor && keyWords.length > 0) {
-      terms.push(`${vendor} ${keyWords.slice(0, 3).join(' ')}`);
-    }
-    
-    // Strategy 4: Main product words only (2-3 key terms)
-    if (titleWords.length >= 2) {
-      terms.push(titleWords.slice(0, 3).join(' '));
-    }
-    
-    // Strategy 5: SKU if it looks like a searchable product code
-    if (sku && sku.length >= 3 && !sku.match(/^\d{8,14}$/)) {
-      terms.push(sku);
-    }
-    
-    // Strategy 6: Individual significant words
-    titleWords.forEach(word => {
-      if (word.length > 4 && !terms.some(term => term.includes(word))) {
-        terms.push(word);
-      }
-    });
-    
-    // Remove duplicates and empty terms
-    return [...new Set(terms)].filter(term => term && term.trim().length > 2);
-  };
-
-  // Calculate relevance score for search results
-  const calculateRelevanceScore = (item, originalTitle, originalVendor) => {
-    let score = 0;
-    
-    const itemTitle = (item.title || '').toLowerCase();
-    const itemBrand = (item.brand || '').toLowerCase();
-    const searchTitle = originalTitle.toLowerCase();
-    const searchVendor = originalVendor.toLowerCase();
-    
-    // Title matching (most important)
-    const titleWords = searchTitle.split(' ').filter(w => w.length > 2);
-    const matchedWords = titleWords.filter(word => itemTitle.includes(word));
-    score += (matchedWords.length / titleWords.length) * 0.6;
-    
-    // Brand matching
-    if (itemBrand && searchVendor) {
-      if (itemBrand.includes(searchVendor) || searchVendor.includes(itemBrand)) {
-        score += 0.3;
-      }
-    }
-    
-    // Exact phrase matching
-    if (itemTitle.includes(searchTitle) || searchTitle.includes(itemTitle)) {
-      score += 0.1;
-    }
-    
-    return score;
-  };
-
-  // Check if product is wellness/supplement related
-  const isWellnessProduct = (title, type) => {
-    const wellnessKeywords = [
-      'vitamin', 'supplement', 'protein', 'powder', 'capsule', 'tablet',
-      'omega', 'probiotics', 'collagen', 'magnesium', 'calcium', 'zinc',
-      'herb', 'extract', 'organic', 'natural', 'wellness', 'health'
-    ];
-    
-    const text = `${title} ${type}`.toLowerCase();
-    return wellnessKeywords.some(keyword => text.includes(keyword));
-  };
-
-  // Extract potential GTINs from product data
-  const extractPotentialGTINs = (title, sku) => {
-    const potentials = [];
-    
-    // Check SKU for GTIN-like patterns
-    if (sku && /^\d{8,14}$/.test(sku)) {
-      potentials.push(sku);
-    }
-    
-    // Check title for numeric codes
-    const numbers = title.match(/\b\d{8,14}\b/g) || [];
-    potentials.push(...numbers);
-    
-    // Check for UPC patterns in title (UPC: followed by numbers)
-    const upcMatches = title.match(/UPC:?\s*(\d{8,14})/gi) || [];
-    upcMatches.forEach(match => {
-      const number = match.match(/\d{8,14}/)[0];
-      potentials.push(number);
-    });
-    
-    return [...new Set(potentials)];
-  };
-
-  // GTIN validation function
-  const validateGTIN = (gtin) => {
-    if (!gtin || typeof gtin !== 'string') return false;
-    
-    // Must be 8, 12, 13, or 14 digits
-    if (!/^\d{8}$|^\d{12}$|^\d{13}$|^\d{14}$/.test(gtin)) return false;
-    
-    // Basic checksum validation for UPC/EAN
-    const digits = gtin.split('').map(Number);
-    let sum = 0;
-    
-    if (gtin.length === 13) { // EAN-13
-      for (let i = 0; i < 12; i++) {
-        sum += digits[i] * (i % 2 === 0 ? 1 : 3);
-      }
-      const checkDigit = (10 - (sum % 10)) % 10;
-      return checkDigit === digits[12];
-    }
-    
-    if (gtin.length === 12) { // UPC-A
-      for (let i = 0; i < 11; i++) {
-        sum += digits[i] * (i % 2 === 0 ? 3 : 1);
-      }
-      const checkDigit = (10 - (sum % 10)) % 10;
-      return checkDigit === digits[11];
-    }
-    
-    // For 8 and 14 digit codes, just return true for now
-    return true;
-  };
-
-  // OpenAI API function with better variety
-  const generateAIDescription = async (product, collection, originalDesc) => {
+  // OpenAI API function with enhanced deterministic prompt variety and more options
+  const generateAIDescription = async (product, collection, originalDesc, productIndex = 0) => {
     const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
-    
     if (!apiKey) {
       throw new Error('OpenAI API key not found');
     }
@@ -514,13 +210,21 @@ Begin with the sensory experience or feeling this product creates. Describe text
 Original: ${originalDesc}
 Collection: ${collection}
 
-Start with an empathetic understanding of the customer's wellness journey. Show how this product supports their goals. Keep all technical details. Write warmly and inclusively. Conclude with "Experience the Thrivera difference."`
+Start with an empathetic understanding of the customer's wellness journey. Show how this product supports their goals. Keep all technical details. Write warmly and inclusively. Conclude with "Experience the Thrivera difference."`,
+
+      // Approach 6: Functional-benefit tone
+      `Write a product description for ${productTitle} in Thrivera's voice, focusing on functional benefits and practical impact.
+
+Original: ${originalDesc}
+Collection: ${collection}
+
+Start with a clear statement of what this product does for the user's wellness or routine. Describe how it fits into daily life, emphasizing practical outcomes. Include all product details and specs. Write in a confident, positive tone. End with "Experience the Thrivera difference."`
     ];
 
-    // Randomly select approach
-    const selectedPrompt = promptVariations[Math.floor(Math.random() * promptVariations.length)];
-    
-    console.log('AI Prompt approach:', Math.floor(Math.random() * promptVariations.length) + 1, 'for:', product.Title);
+    // Deterministically select approach based on product index
+    const promptIndex = productIndex % promptVariations.length;
+    const selectedPrompt = promptVariations[promptIndex];
+    console.log('AI Prompt approach:', promptIndex + 1, 'for:', product.Title);
 
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -532,10 +236,10 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
           messages: [{ role: 'user', content: selectedPrompt }],
-          max_tokens: 250,
-          temperature: 0.9, // Higher for more creativity
-          presence_penalty: 0.6, // Encourage unique content
-          frequency_penalty: 0.4 // Reduce repetitive phrases
+          max_tokens: 350,
+          temperature: 1.0,
+          presence_penalty: 0.8,
+          frequency_penalty: 0.5
         })
       });
 
@@ -546,19 +250,18 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
 
       const data = await response.json();
       return data.choices[0].message.content.trim();
-      
+
     } catch (error) {
       console.error('OpenAI API Call Failed:', error);
       throw error;
     }
   };
 
-  // Generate Thrivera Description
-  const generateThriveraDescription = async (product, collection) => {
+  // Generate Thrivera Description (uses deterministic prompt rotation)
+  const generateThriveraDescription = async (product, collection, productIndex = 0) => {
     const originalDesc = getOriginalDescription(product);
-    
     try {
-      const aiDescription = await generateAIDescription(product, collection, originalDesc);
+      const aiDescription = await generateAIDescription(product, collection, originalDesc, productIndex);
       return aiDescription;
     } catch (error) {
       console.error('OpenAI generation failed, using fallback:', error);
@@ -596,39 +299,37 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
     };
   };
 
-  // Generate Google Shopping Data
-  const generateGoogleShopping = (product, collection, gtin = null) => {
+  // Generate Google Shopping Data (GTIN logic removed)
+  const generateGoogleShopping = (product, collection) => {
     const title = (product.Title || '').toLowerCase();
     const price = parseFloat(product['Variant Price']) || 0;
     const vendor = product.Vendor || '';
     const sku = product['Variant SKU'] || product.SKU || '';
-    
+
     let gender = 'unisex';
     if (title.includes('men') && !title.includes('women')) {
       gender = 'male';
     } else if (title.includes('women') && !title.includes('men')) {
       gender = 'female';
     }
-    
+
     let priceRange = 'budget';
     if (price > 50) priceRange = 'premium';
     else if (price > 25) priceRange = 'mid-range';
-    
+
     const shoppingData = googleShoppingData[collection] || googleShoppingData["Everyday Comforts"];
-    
+
     // Determine if this should be marked as custom product (no GTIN required)
-    const isCustomProduct = !gtin && (
-      title.includes('custom') || 
-      title.includes('handmade') || 
+    const isCustomProduct = (
+      title.includes('custom') ||
+      title.includes('handmade') ||
       title.includes('personalized') ||
       title.includes('vintage') ||
       vendor.toLowerCase().includes('custom') ||
       vendor.toLowerCase().includes('handmade')
     );
-    
-    // Note: Google Shopping settings are typically managed through Shopify's Google Shopping app
-    // The app automatically pulls GTIN from Variant Barcode field
-    const googleShoppingData = {
+
+    const googleShoppingFields = {
       'Google Shopping / Google Product Category': shoppingData.category,
       'Google Shopping / Gender': gender,
       'Google Shopping / Age Group': 'adult',
@@ -640,14 +341,14 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
       'Google Shopping / Custom Label 3': shoppingData.customLabel3,
       'Google Shopping / Custom Label 4': 'thrivera-wellness'
     };
-    
-    // Add MPN as alternative identifier if no GTIN
-    if (!gtin && sku) {
-      googleShoppingData['Google Shopping / MPN'] = sku;
-      googleShoppingData['Google Shopping / Brand'] = vendor || 'Thrivera';
+
+    // Add MPN as alternative identifier
+    if (sku) {
+      googleShoppingFields['Google Shopping / MPN'] = sku;
+      googleShoppingFields['Google Shopping / Brand'] = vendor || 'Thrivera';
     }
-    
-    return googleShoppingData;
+
+    return googleShoppingFields;
   };
 
   // Handle cancel processing - FIXED with useRef
@@ -660,12 +361,12 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
   // Process all products automatically - FIXED cancel logic
   const processAllProducts = useCallback(async () => {
     if (products.length === 0) return;
-    
+
     console.log('Starting processing...');
     setProcessing(true);
     setUploadError('');
     cancelRef.current = false; // Reset cancel flag
-    
+
     let productsToProcess = [];
     if (processingMode === 'smart') {
       productsToProcess = products.filter(product => !isAlreadyEnriched(product));
@@ -674,7 +375,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
       productsToProcess = products;
       console.log(`Force mode: Processing all ${products.length} products`);
     }
-    
+
     setProcessingStats({
       total: productsToProcess.length,
       current: 0,
@@ -683,16 +384,16 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
       toProcess: productsToProcess.length,
       alreadyEnriched: products.length - productsToProcess.length
     });
-    
+
     if (productsToProcess.length === 0) {
       setUploadError('All products are already enriched! Use "Force All" mode to reprocess everything.');
       setProcessing(false);
       return;
     }
-    
+
     try {
       const processedProducts = [...products];
-      
+
       for (let i = 0; i < productsToProcess.length; i++) {
         // Check cancel flag at start of each iteration
         if (cancelRef.current) {
@@ -700,70 +401,41 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
           setUploadError('Processing was cancelled by user.');
           break;
         }
-        
+
         const product = productsToProcess[i];
-        
+
         setProcessingStats(prev => ({
           ...prev,
           current: i + 1,
           currentProduct: product.Title || `Product ${i + 1}`
         }));
-        
+
         try {
           console.log(`Processing product ${i + 1}/${productsToProcess.length}:`, product.Title);
-          
+
           setProcessingStats(prev => ({
             ...prev,
             currentAction: 'Detecting collection...'
           }));
-          
+
           const detectedCollection = detectCollection(product.Title, getOriginalDescription(product));
-          
+
           setProcessingStats(prev => ({
             ...prev,
             currentAction: 'Generating AI description...'
           }));
-          
-          const newDescription = await generateThriveraDescription(product, detectedCollection);
+
+          const newDescription = await generateThriveraDescription(product, detectedCollection, i);
           const seoContent = generateSEO(product, detectedCollection);
-          
-          setProcessingStats(prev => ({
-            ...prev,
-            currentAction: 'Searching for GTIN...'
-          }));
-          
-          // Look for GTIN with enhanced search
-          const gtinResult = await searchForGTIN(product, (action) => {
-            setProcessingStats(prev => ({
-              ...prev,
-              currentAction: action
-            }));
-          });
-          
-          let gtin = null;
-          let gtinStatus = 'Not found';
-          let searchSuggestions = [];
-          
-          if (typeof gtinResult === 'string') {
-            if (gtinResult === 'LOOKUP_NEEDED') {
-              gtinStatus = 'Manual lookup required';
-            } else {
-              gtin = gtinResult;
-              gtinStatus = 'Found';
-            }
-          } else if (typeof gtinResult === 'object' && gtinResult.status) {
-            gtinStatus = gtinResult.message || 'Manual lookup required';
-            searchSuggestions = gtinResult.searchSuggestions || [];
-          }
-          
+
           setProcessingStats(prev => ({
             ...prev,
             currentAction: 'Finalizing product data...'
           }));
-          
-          const googleShopping = generateGoogleShopping(product, detectedCollection, gtin);
+
+          const googleShopping = generateGoogleShopping(product, detectedCollection);
           const newTags = collectionTags[detectedCollection].tags.join(', ');
-          
+
           const result = {
             ...product,
             enriched: true,
@@ -773,42 +445,39 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
             originalTags: product.Tags || '',
             originalSeoTitle: product['SEO Title'] || '',
             originalSeoDescription: product['SEO Description'] || '',
-            foundGTIN: gtin,
-            gtinStatus: gtinStatus,
-            gtinSearchSuggestions: searchSuggestions,
             newDescription,
             newTags,
             newSeoTitle: seoContent.title,
             newSeoDescription: seoContent.description,
             ...googleShopping
           };
-          
+
           const productIndex = processedProducts.findIndex(p => p.id === product.id);
           if (productIndex !== -1) {
             processedProducts[productIndex] = result;
           }
-          
+
           setProducts([...processedProducts]);
-          
+
           // Check cancel flag before delay
           if (cancelRef.current) {
             console.log('Cancel detected, breaking loop');
             break;
           }
-          
+
           if (i < productsToProcess.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
-          
+
         } catch (error) {
           console.error('Error processing product:', product.Title, error);
           // Continue with next product even if one fails
         }
       }
-      
+
       setProducts(processedProducts);
       console.log('Processing completed');
-      
+
     } catch (error) {
       console.error('Processing error:', error);
       setUploadError('Error processing products: ' + error.message);
@@ -960,7 +629,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
     }
   };
 
-  // Export functions
+  // Export functions (GTIN logic removed)
   const exportEnrichedData = (includeTracking = false) => {
     if (products.length === 0) {
       alert('No products to export. Please upload and process products first.');
@@ -976,7 +645,7 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
     try {
       const enrichedData = products.map(product => {
         const cleanProduct = { ...product };
-        
+
         delete cleanProduct.enriched;
         delete cleanProduct.enrichedAt;
         delete cleanProduct.detectedCollection;
@@ -988,43 +657,24 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
         delete cleanProduct.newTags;
         delete cleanProduct.newSeoTitle;
         delete cleanProduct.newSeoDescription;
-        delete cleanProduct.foundGTIN;
-        delete cleanProduct.gtinStatus;
-        delete cleanProduct.gtinSearchSuggestions;
         delete cleanProduct.id;
-        
+
         // Note: Google Shopping settings are configured in Shopify's Google Shopping app
         // They are not imported via CSV - the app pulls data from standard product fields
-        
+
         if (product.enriched) {
           cleanProduct['Body (HTML)'] = product.newDescription || product.originalDescription;
           cleanProduct['Tags'] = product.newTags || product.originalTags;
           cleanProduct['SEO Title'] = product.newSeoTitle || product.originalSeoTitle;
           cleanProduct['SEO Description'] = product.newSeoDescription || product.originalSeoDescription;
-          
-          // Add GTIN to Shopify's standard barcode field ONLY
-          // Shopify doesn't accept arbitrary Google Shopping columns in product import
-          if (product.foundGTIN && product.foundGTIN !== 'LOOKUP_NEEDED') {
-            cleanProduct['Variant Barcode'] = product.foundGTIN; // Standard Shopify barcode field
-          }
-          
-          // Note: Google Shopping GTIN is handled by Shopify's Google Shopping app automatically
-          // It pulls from the Variant Barcode field, so no separate column needed
         }
-        
+
         if (includeTracking) {
           cleanProduct['Enrichment Status'] = product.enriched ? 'Enriched' : 'Pending';
           cleanProduct['Detected Collection'] = product.detectedCollection || '';
           cleanProduct['Enriched Date'] = product.enrichedAt || '';
-          cleanProduct['GTIN Status'] = product.gtinStatus || '';
-          cleanProduct['Found GTIN'] = product.foundGTIN || '';
-          cleanProduct['Google Shopping Strategy'] = product.foundGTIN ? 
-            'GTIN' : 
-            `MPN + Brand (${product['Variant SKU'] || product.SKU || 'SKU'} + ${product.Vendor || 'Thrivera'})`;
-          cleanProduct['GTIN Search Sites'] = product.gtinSearchSuggestions ? 
-            product.gtinSearchSuggestions.map(s => s.site).join(' | ') : '';
         }
-        
+
         return cleanProduct;
       });
 
@@ -1033,14 +683,14 @@ Start with an empathetic understanding of the customer's wellness journey. Show 
         skipEmptyLines: true,
         quotes: false
       });
-      
+
       const timestamp = new Date().toISOString().split('T')[0];
-      const filename = includeTracking ? 
+      const filename = includeTracking ?
         `thrivera_products_with_tracking_${timestamp}.csv` :
         `thrivera_shopify_import_${timestamp}.csv`;
-      
+
       downloadFile(csv, filename);
-      
+
     } catch (error) {
       console.error('Export failed:', error);
       alert('Export failed: ' + error.message);
