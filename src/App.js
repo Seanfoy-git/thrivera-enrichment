@@ -693,18 +693,28 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
           cleanProduct["Status"] = "active";
         }
 
-        // Robust Option Name inference for Option1/2/3
+        // Shopify-safe Option Name/Value inference and cleanup (preserve valid input, infer only if needed)
         ["1", "2", "3"].forEach((num) => {
           const valKey = `Option${num} Value`;
           const nameKey = `Option${num} Name`;
 
-          const value = cleanProduct[valKey];
-          if (value && (!cleanProduct[nameKey] || cleanProduct[nameKey].toString().trim() === "")) {
-            cleanProduct[nameKey] = inferOptionName(value);
-          }
-          // Final fallback to ensure Shopify doesn't reject
-          if (value && (!cleanProduct[nameKey] || cleanProduct[nameKey].toString().trim() === "")) {
-            cleanProduct[nameKey] = "Variant";
+          const rawValue = cleanProduct[valKey];
+          const rawName = cleanProduct[nameKey];
+
+          const trimmedValue = rawValue ? rawValue.toString().trim() : "";
+          const trimmedName = rawName ? rawName.toString().trim() : "";
+
+          if (trimmedValue === "") {
+            // If there's no value, clear both fields (Shopify doesn't want stray names)
+            delete cleanProduct[valKey];
+            delete cleanProduct[nameKey];
+          } else if (!trimmedName) {
+            // Only infer the name if it was blank or missing in the input
+            cleanProduct[nameKey] = inferOptionName(trimmedValue);
+          } else {
+            // Leave existing name and value untouched, but trim
+            cleanProduct[valKey] = trimmedValue;
+            cleanProduct[nameKey] = trimmedName;
           }
         });
 
