@@ -170,7 +170,7 @@ const App = () => {
     const productType = product['Product Type'] || '';
     const vendor = product.Vendor || '';
 
-    // Create different prompt approaches for REAL variety
+    // Create different prompt approaches for REAL variety, with refined instructions to avoid repetitive verbs and marketing clichés
     const promptVariations = [
       // Approach 1: Benefits-focused
       `You are writing a wellness-focused product description for ${productTitle}.
@@ -178,7 +178,7 @@ const App = () => {
 Original description: ${originalDesc}
 Collection: ${collection}
 
-Open with a relatable moment, insight, or user perspective—avoid directive phrases and do not start with "Transform," "Start," "Write," or "Create." Do not use repeated openings like "Designed for..." or "Introducing...". Focus on how this specific product enhances daily wellness. Keep all product details like size, color, material, scent, etc. Write 2-3 paragraphs ending with "Experience the Thrivera difference." Be conversational and specific.`,
+Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,’ ‘Indulge,’ ‘Discover,’ or ‘Experience’. Vary sentence structure and avoid marketing clichés. Begin with observations, lifestyle moments, or unique product details. Open with a relatable moment, insight, or user perspective—avoid directive phrases and do not start with "Transform," "Start," "Write," or "Create." Do not use repeated openings like "Designed for..." or "Introducing...". Focus on how this specific product enhances daily wellness. Keep all product details like size, color, material, scent, etc. Write 2-3 paragraphs ending with "Experience the Thrivera difference." Be conversational and specific. Do not use "Experience the Thrivera difference." as an opening or repeated structure.`,
 
       // Approach 2: Lifestyle-focused  
       `Rewrite the following product description for ${productTitle} in Thrivera's wellness voice.
@@ -186,7 +186,7 @@ Open with a relatable moment, insight, or user perspective—avoid directive phr
 Original: ${originalDesc}
 Collection: ${collection}
 
-Introduce the product in the context of a wellness routine or daily ritual—skip generic openings and do not use phrases like "Start," "Write," "Transform," or "Create." Avoid repeated beginnings such as "Introducing..." or "Designed for...". Highlight specific features and benefits. Maintain all technical details. Write naturally as if recommending to a friend. End with "Experience the Thrivera difference."`,
+Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,’ ‘Indulge,’ ‘Discover,’ or ‘Experience’. Vary sentence structure and avoid marketing clichés. Begin with observations, lifestyle moments, or unique product details. Introduce the product in the context of a wellness routine or daily ritual—skip generic openings and do not use phrases like "Start," "Write," "Transform," or "Create." Avoid repeated beginnings such as "Introducing..." or "Designed for...". Highlight specific features and benefits. Maintain all technical details. Write naturally as if recommending to a friend. End with "Experience the Thrivera difference." Do not use "Experience the Thrivera difference." as an opening or repeated structure.`,
 
       // Approach 3: Problem-solution focused
       `Provide a Thrivera-style description for ${productTitle} that addresses wellness needs.
@@ -194,7 +194,7 @@ Introduce the product in the context of a wellness routine or daily ritual—ski
 Original: ${originalDesc}  
 Collection: ${collection}
 
-Set the scene by referencing a common challenge or aspiration relevant to this product, but do not use direct instructions or openings like "Start," "Write," "Create," or "Transform." Do not repeat "Designed for..." or "Introducing...". Explain the solution this product provides. Keep all specifications intact. Write 150-200 words ending with "Experience the Thrivera difference."`,
+Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,’ ‘Indulge,’ ‘Discover,’ or ‘Experience’. Vary sentence structure and avoid marketing clichés. Begin with observations, lifestyle moments, or unique product details. Set the scene by referencing a common challenge or aspiration relevant to this product, but do not use direct instructions or openings like "Start," "Write," "Create," or "Transform." Do not repeat "Designed for..." or "Introducing...". Explain the solution this product provides. Keep all specifications intact. Write 150-200 words ending with "Experience the Thrivera difference." Do not use "Experience the Thrivera difference." as an opening or repeated structure.`,
 
       // Approach 4: Sensory-focused
       `Compose an engaging product description for ${productTitle} with a focus on sensory wellness.
@@ -202,7 +202,7 @@ Set the scene by referencing a common challenge or aspiration relevant to this p
 Original: ${originalDesc}
 Collection: ${collection}
 
-Begin with a vivid sensory detail, atmosphere, or feeling—avoid directive or formulaic openings. Do not use "Start," "Write," "Create," "Transform," "Introducing...," or "Designed for..." at the beginning. Describe textures, comfort, or atmosphere. Preserve all product specifications. Make it feel premium and thoughtful. End with "Experience the Thrivera difference."`,
+Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,’ ‘Indulge,’ ‘Discover,’ or ‘Experience’. Vary sentence structure and avoid marketing clichés. Begin with observations, lifestyle moments, or unique product details. Begin with a vivid sensory detail, atmosphere, or feeling—avoid directive or formulaic openings. Do not use "Start," "Write," "Create," "Transform," "Introducing...," or "Designed for..." at the beginning. Describe textures, comfort, or atmosphere. Preserve all product specifications. Make it feel premium and thoughtful. End with "Experience the Thrivera difference." Do not use "Experience the Thrivera difference." as an opening or repeated structure.`,
 
       // Approach 5: Community-focused
       `Craft a Thrivera description for ${productTitle} that feels personal and supportive.
@@ -210,7 +210,7 @@ Begin with a vivid sensory detail, atmosphere, or feeling—avoid directive or f
 Original: ${originalDesc}
 Collection: ${collection}
 
-Open by reflecting an empathetic understanding of the customer's wellness journey, without using directive phrases or repeated openings like "Start," "Write," "Create," "Transform," "Introducing...," or "Designed for...". Show how this product supports their goals. Keep all technical details. Write warmly and inclusively. Conclude with "Experience the Thrivera difference."`,
+Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,’ ‘Indulge,’ ‘Discover,’ or ‘Experience’. Vary sentence structure and avoid marketing clichés. Begin with observations, lifestyle moments, or unique product details. Open by reflecting an empathetic understanding of the customer's wellness journey, without using directive phrases or repeated openings like "Start," "Write," "Create," "Transform," "Introducing...," or "Designed for...". Show how this product supports their goals. Keep all technical details. Write warmly and inclusively. Conclude with "Experience the Thrivera difference." Do not use "Experience the Thrivera difference." as an opening or repeated structure.`,
 
       // Approach 6: Functional-benefit tone
       `Describe ${productTitle} in Thrivera's voice, focusing on functional benefits and practical impact.
@@ -218,7 +218,7 @@ Open by reflecting an empathetic understanding of the customer's wellness journe
 Original: ${originalDesc}
 Collection: ${collection}
 
-Lead with a natural, benefit-oriented statement about how this product fits into the user's wellness or daily routine—do not use openings like "Start," "Write," "Create," "Transform," "Introducing...," or "Designed for...". Emphasize practical outcomes and include all product details and specs. Write in a confident, positive tone. End with "Experience the Thrivera difference."`
+Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,’ ‘Indulge,’ ‘Discover,’ or ‘Experience’. Vary sentence structure and avoid marketing clichés. Begin with observations, lifestyle moments, or unique product details. Lead with a natural, benefit-oriented statement about how this product fits into the user's wellness or daily routine—do not use openings like "Start," "Write," "Create," "Transform," "Introducing...," or "Designed for...". Emphasize practical outcomes and include all product details and specs. Write in a confident, positive tone. End with "Experience the Thrivera difference." Do not use "Experience the Thrivera difference." as an opening or repeated structure.`
     ];
 
     // Deterministically select approach based on product index
