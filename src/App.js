@@ -866,6 +866,10 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
                       </div>
                     )}
                   </div>
+                  {/* Show export complete message if progress is 100% */}
+                  {processingStats.total > 0 && Math.round((processingStats.current / processingStats.total) * 100) === 100 && (
+                    <p className="mt-4 text-green-700 text-center">✅ Export complete!</p>
+                  )}
                 </div>
                 
                 <div className="flex items-center gap-2 text-green-600">
