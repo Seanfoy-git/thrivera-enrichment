@@ -721,10 +721,8 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
         return cleanProduct;
       });
 
-      // Limit export rows to first 5 for Shopify test uploads
-      const limitedRowsToExport = rowsToExport.slice(0, 5);
-
-      const csv = Papa.unparse(limitedRowsToExport, {
+      // Export all rows for Shopify
+      const csv = Papa.unparse(rowsToExport, {
         header: true,
         skipEmptyLines: true,
         quotes: false
