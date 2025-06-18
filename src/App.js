@@ -96,6 +96,7 @@ const App = () => {
     alreadyEnriched: 0 
   });
   const [csvColumns, setCsvColumns] = useState([]);
+  const [devMode, setDevMode] = useState(false);
   
   // Use useRef for cancel flag to get immediate updates
   const cancelRef = useRef(false);
@@ -405,6 +406,20 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
           currentProduct: product.Title || `Product ${i + 1}`
         }));
 
+        // DEV MODE: Only update Google Shopping fields and skip full enrichment
+        if (devMode) {
+          const detectedCollection = detectCollection(product.Title, getOriginalDescription(product));
+          const googleShopping = generateGoogleShopping(product, detectedCollection);
+          const productIndex = processedProducts.findIndex(p => p.id === product.id);
+          if (productIndex !== -1) {
+            processedProducts[productIndex] = {
+              ...processedProducts[productIndex],
+              ...googleShopping
+            };
+          }
+          continue; // Skip full enrichment
+        }
+
         try {
           console.log(`Processing product ${i + 1}/${productsToProcess.length}:`, product.Title);
 
@@ -481,7 +496,7 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
       cancelRef.current = false;
       setProcessingStats({ total: 0, current: 0, currentProduct: '', currentAction: '', toProcess: 0, alreadyEnriched: 0 });
     }
-  }, [products, processingMode]);
+  }, [products, processingMode, devMode]);
 
   // Handle file upload with column detection
   const handleFileUpload = useCallback((event) => {
@@ -790,6 +805,14 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
                     <span className="font-medium">Force All</span>
                     <p className="text-sm text-gray-600">Reprocess everything, even products that are already enriched</p>
                   </div>
+                </label>
+                <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={devMode} 
+                    onChange={(e) => setDevMode(e.target.checked)} 
+                  />
+                  Dev Mode (only update Google Shopping fields)
                 </label>
               </div>
             </div>
