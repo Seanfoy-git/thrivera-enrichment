@@ -299,12 +299,13 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
     };
   };
 
-  // Generate Google Shopping Data (GTIN logic removed)
+  // Generate Google Shopping Data (improved GTIN/MPN/Custom Product logic)
   const generateGoogleShopping = (product, collection) => {
     const title = (product.Title || '').toLowerCase();
     const price = parseFloat(product['Variant Price']) || 0;
     const vendor = product.Vendor || '';
     const sku = product['Variant SKU'] || product.SKU || '';
+    const barcode = product['Variant Barcode'] || product.Barcode || product.UPC || product.EAN || product.ISBN || '';
 
     let gender = 'unisex';
     if (title.includes('men') && !title.includes('women')) {
@@ -319,22 +320,11 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
 
     const shoppingData = googleShoppingData[collection] || googleShoppingData["Everyday Comforts"];
 
-    // Determine if this should be marked as custom product (no GTIN required)
-    const isCustomProduct = (
-      title.includes('custom') ||
-      title.includes('handmade') ||
-      title.includes('personalized') ||
-      title.includes('vintage') ||
-      vendor.toLowerCase().includes('custom') ||
-      vendor.toLowerCase().includes('handmade')
-    );
-
     const googleShoppingFields = {
       'Google Shopping / Google Product Category': shoppingData.category,
       'Google Shopping / Gender': gender,
       'Google Shopping / Age Group': 'adult',
       'Google Shopping / Condition': 'new',
-      'Google Shopping / Custom Product': isCustomProduct ? 'TRUE' : 'FALSE',
       'Google Shopping / Custom Label 0': shoppingData.customLabel0,
       'Google Shopping / Custom Label 1': priceRange,
       'Google Shopping / Custom Label 2': vendor.substring(0, 20),
@@ -342,10 +332,15 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
       'Google Shopping / Custom Label 4': 'thrivera-wellness'
     };
 
-    // Add MPN as alternative identifier
-    if (sku) {
+    if (barcode) {
+      googleShoppingFields['Google Shopping / GTIN'] = barcode;
+      googleShoppingFields['Google Shopping / Custom Product'] = 'FALSE';
+    } else if (sku) {
       googleShoppingFields['Google Shopping / MPN'] = sku;
       googleShoppingFields['Google Shopping / Brand'] = vendor || 'Thrivera';
+      googleShoppingFields['Google Shopping / Custom Product'] = 'FALSE';
+    } else {
+      googleShoppingFields['Google Shopping / Custom Product'] = 'TRUE';
     }
 
     return googleShoppingFields;
