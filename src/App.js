@@ -271,31 +271,52 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
     }
   };
 
-  // Generate SEO Content
+  // Generate SEO Content (2025 best practices)
+  const extractSeoKeywords = (product, collection) => {
+    const keywords = new Set();
+    const title = (product.Title || '').toLowerCase();
+    const type = (product['Product Type'] || '').toLowerCase();
+    const vendor = (product.Vendor || '').toLowerCase();
+    const coll = (collection || '').toLowerCase();
+
+    if (title.includes('lavender')) keywords.add('lavender');
+    if (title.includes('diffuser')) keywords.add('diffuser');
+    if (title.includes('eye mask')) keywords.add('eye mask');
+    if (type.includes('pillow')) keywords.add('pillow');
+    if (type.includes('aromatherapy')) keywords.add('aromatherapy');
+    if (coll.includes('sleep')) keywords.add('sleep aid');
+    if (coll.includes('mind')) keywords.add('stress relief');
+    if (coll.includes('movement')) keywords.add('mobility support');
+    if (vendor && !keywords.has(vendor)) keywords.add(vendor);
+
+    return Array.from(keywords).slice(0, 3).join(', ');
+  };
+
   const generateSEO = (product, collection) => {
     const productName = product.Title?.trim() || product.Handle || 'Wellness Product';
-    const seoTitle = `${productName} - Wellness Collection | Thrivera`;
-    
+    const seoKeywords = extractSeoKeywords(product, collection);
+    const seoTitle = `${productName}${seoKeywords ? ` | ${seoKeywords} - Thrivera` : ' | Thrivera'}`.substring(0, 60);
+
     const originalDesc = getOriginalDescription(product);
     const firstSentence = originalDesc.split('.')[0] || productName;
     
     let seoDescription = '';
     if (collection === 'Mind and Mood') {
-      seoDescription = `Mindfully selected ${productName.toLowerCase()} for mental wellness & emotional balance. ${firstSentence}. `;
+      seoDescription = `Support focus, calm, and emotional balance with ${productName.toLowerCase()}. ${firstSentence}.`;
     } else if (collection === 'Movement and Flow') {
-      seoDescription = `Thoughtfully curated ${productName.toLowerCase()} to support your active wellness journey. ${firstSentence}. `;
+      seoDescription = `Enhance mobility and daily movement with ${productName.toLowerCase()}. ${firstSentence}.`;
     } else if (collection === 'Rest and Sleep') {
-      seoDescription = `Carefully chosen ${productName.toLowerCase()} for peaceful rest & restorative sleep. ${firstSentence}. `;
+      seoDescription = `Aid sleep and nighttime relaxation with ${productName.toLowerCase()}. ${firstSentence}.`;
     } else if (collection === 'Supportive Living') {
-      seoDescription = `Lovingly selected ${productName.toLowerCase()} to enhance daily confidence & independence. ${firstSentence}. `;
+      seoDescription = `Boost confidence and safety in daily living with ${productName.toLowerCase()}. ${firstSentence}.`;
     } else {
-      seoDescription = `Wellness-focused ${productName.toLowerCase()} for everyday comfort & well-being. ${firstSentence}. `;
+      seoDescription = `Add comfort and ease to your routine with ${productName.toLowerCase()}. ${firstSentence}.`;
     }
-    
-    seoDescription += 'Shop Thrivera\'s curated wellness collection.';
-    
+
+    seoDescription += ' Shop curated wellness at Thrivera.';
+
     return {
-      title: seoTitle.length > 60 ? seoTitle.substring(0, 57) + '...' : seoTitle,
+      title: seoTitle,
       description: seoDescription.length > 160 ? seoDescription.substring(0, 157) + '...' : seoDescription
     };
   };
