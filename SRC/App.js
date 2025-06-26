@@ -813,7 +813,23 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
                     <p className="text-sm text-gray-600">Skip products that already have Thrivera voice or collection tags</p>
                   </div>
                 </label>
-                
+
+                <label className="flex items-center mb-3 cursor-pointer">
+                  <input 
+                    type="radio" 
+                    value="reassign" 
+                    checked={processingMode === 'reassign'}
+                    onChange={(e) => setProcessingMode(e.target.value)}
+                    className="mr-3"
+                  />
+                  <div>
+                    <span className="font-medium">Reassign Collection Only</span>
+                    <p className="text-sm text-gray-600">
+                      Only update collection, tags, and Google Shopping fields
+                    </p>
+                  </div>
+                </label>
+
                 <label className="flex items-center cursor-pointer">
                   <input 
                     type="radio" 
