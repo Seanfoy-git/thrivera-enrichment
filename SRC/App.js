@@ -441,6 +441,27 @@ Avoid starting with or repeating action verbs such as ‘Elevate,’ ‘Embrace,
           continue; // Skip full enrichment
         }
 
+        // REASSIGN MODE: Only update detectedCollection, tags, and Google Shopping fields, skip AI/SEO enrichment
+        if (processingMode === 'reassign') {
+          const forced = product["Force Collection"];
+          const detectedCollection = forced || detectCollection(product.Title, getOriginalDescription(product));
+          const googleShopping = generateGoogleShopping(product, detectedCollection);
+          const newTags = collectionTags[detectedCollection].tags.join(', ');
+
+          const productIndex = processedProducts.findIndex(p => p.id === product.id);
+          if (productIndex !== -1) {
+            processedProducts[productIndex] = {
+              ...processedProducts[productIndex],
+              enriched: true,
+              enrichedAt: new Date().toISOString(),
+              detectedCollection,
+              newTags,
+              ...googleShopping
+            };
+          }
+          continue; // Skip AI and SEO enrichment
+        }
+
         try {
           console.log(`Processing product ${i + 1}/${productsToProcess.length}:`, product.Title);
 
